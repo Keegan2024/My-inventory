@@ -1,0 +1,7 @@
+<h2>Reports</h2>
+<ul>
+    {% for report in reports %}
+        <li>Report ID: {{ report.id }}, Commodity ID: {{ report.commodity_id }}, Quantity Used: {{ report.quantity_used }}</li>
+    {% endfor %}
+</ul>
+<a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
