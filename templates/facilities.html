@@ -1,20 +1,7 @@
-<!-- templates/facilities.html -->
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Manage Facilities</title>
-</head>
-<body>
-    <h2>Manage Facilities</h2>
-    <a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
-    <form method="POST">
-        <input type="text" name="name" placeholder="Facility Name" required>
-        <button type="submit">Add Facility</button>
-    </form>
-    <ul>
-        {% for facility in facilities %}
-            <li>{{ facility.name }}</li>
-        {% endfor %}
-    </ul>
-</body>
-</html>
+<h2>Facilities</h2>
+<ul>
+    {% for facility in facilities %}
+        <li>{{ facility.name }}</li>
+    {% endfor %}
+</ul>
+<a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
