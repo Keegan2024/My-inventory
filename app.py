@@ -41,6 +41,14 @@ class Report(db.Model):
     date_submitted = db.Column(db.DateTime, default=datetime.utcnow)
 
 # ---------------------------
+# Helper: Check if current user is admin
+# ---------------------------
+def is_admin():
+    username = session.get('username')
+    user = User.query.filter_by(username=username).first()
+    return user and user.role == 'admin'
+
+# ---------------------------
 # Routes
 # ---------------------------
 
@@ -84,13 +92,39 @@ def dashboard():
     user = User.query.filter_by(username=username).first()
     return render_template('dashboard.html', user=user)
 
-@app.route('/commodities')
+@app.route('/commodities', methods=['GET', 'POST'])
 def manage_commodities():
+    if not is_admin():
+        flash('Access denied. Admins only.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    if request.method == 'POST':
+        name = request.form['name']
+        if name:
+            new_commodity = Commodity(name=name)
+            db.session.add(new_commodity)
+            db.session.commit()
+            flash('Commodity added successfully.', 'success')
+            return redirect(url_for('manage_commodities'))
+
     commodities = Commodity.query.all()
     return render_template('commodities.html', commodities=commodities)
 
-@app.route('/facilities')
+@app.route('/facilities', methods=['GET', 'POST'])
 def manage_facilities():
+    if not is_admin():
+        flash('Access denied. Admins only.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    if request.method == 'POST':
+        name = request.form['name']
+        if name:
+            new_facility = Facility(name=name)
+            db.session.add(new_facility)
+            db.session.commit()
+            flash('Facility added successfully.', 'success')
+            return redirect(url_for('manage_facilities'))
+
     facilities = Facility.query.all()
     return render_template('facilities.html', facilities=facilities)
 
@@ -105,6 +139,10 @@ def view_reports():
 
 @app.route('/users')
 def manage_users():
+    if not is_admin():
+        flash('Access denied. Admins only.', 'danger')
+        return redirect(url_for('dashboard'))
+
     users = User.query.all()
     return render_template('users.html', users=users)
 
