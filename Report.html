@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Reports</title>
+</head>
+<body>
+    <h2>Reports</h2>
+    <a href="{{ url_for('export_reports') }}">Export to Excel (CSV)</a>
+    <ul>
+        {% for r in reports %}
+            <li>
+                Facility ID: {{ r.facility_id }} — Commodity ID: {{ r.commodity_id }} — Period: {{ r.period }} — Used: {{ r.quantity_used }} — Status: {{ r.status }} — Feedback: {{ r.feedback }}
+            </li>
+        {% endfor %}
+    </ul>
+    <a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+</body>
+</html>
