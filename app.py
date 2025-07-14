@@ -42,10 +42,6 @@ class Report(db.Model):
     expiry_date = db.Column(db.String(20), nullable=False)
     date_submitted = db.Column(db.DateTime, default=datetime.utcnow)
 
-# ---------------------------
-# Routes (short version example)
-# ---------------------------
-
 @app.route('/')
 def index():
     return redirect(url_for('login'))
@@ -77,10 +73,6 @@ def dashboard():
 def logout():
     session.clear()
     return redirect(url_for('login'))
-
-# ---------------------------
-# Add more routes here (admin, report submission, exports, etc.)
-# ---------------------------
 
 if __name__ == '__main__':
     db.create_all()
