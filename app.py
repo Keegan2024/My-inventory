@@ -70,7 +70,7 @@ def login():
         if user and check_password_hash(user.password, password):
             if user.approved:
                 flash('Login successful!', 'success')
-                session['username'] = user.username  # ✅ Save username to session
+                session['username'] = user.username
                 return redirect(url_for('dashboard'))
             else:
                 flash('Account not yet approved by admin.', 'danger')
@@ -84,6 +84,30 @@ def dashboard():
     user = User.query.filter_by(username=username).first()
     return render_template('dashboard.html', user=user)
 
+@app.route('/commodities')
+def manage_commodities():
+    commodities = Commodity.query.all()
+    return render_template('commodities.html', commodities=commodities)
+
+@app.route('/facilities')
+def manage_facilities():
+    facilities = Facility.query.all()
+    return render_template('facilities.html', facilities=facilities)
+
+@app.route('/submit_report')
+def submit_report():
+    return "Submit Report Page (we can build a form here next!)"
+
+@app.route('/view_reports')
+def view_reports():
+    reports = Report.query.all()
+    return render_template('reports.html', reports=reports)
+
+@app.route('/users')
+def manage_users():
+    users = User.query.all()
+    return render_template('users.html', users=users)
+
 @app.route('/logout')
 def logout():
     session.pop('username', None)
@@ -96,8 +120,6 @@ def logout():
 
 with app.app_context():
     db.create_all()
-
-    # Create or update Keegan user
     user = User.query.filter_by(username='Keegan').first()
     if user:
         user.password = generate_password_hash('44665085')
@@ -111,3 +133,5 @@ with app.app_context():
         db.session.commit()
         print("✅ User 'Keegan' created as admin!")
 
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0')
