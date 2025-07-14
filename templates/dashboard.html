@@ -1,19 +1,20 @@
-<!-- templates/dashboard.html -->
 <!DOCTYPE html>
 <html>
 <head>
-    <title>User Dashboard</title>
+    <title>Dashboard</title>
 </head>
 <body>
-    <h2>Welcome to Your Dashboard</h2>
-    <a href="{{ url_for('submit_report') }}">Submit Report</a> | 
-    <a href="{{ url_for('export_excel') }}">Export Reports</a> | 
-    <a href="{{ url_for('logout') }}">Logout</a>
-    <h3>Your Submitted Reports</h3>
+    <h1>Welcome to the Dashboard!</h1>
+    <p>You are logged in as {{ user.username }} (Role: {{ user.role }})</p>
+
     <ul>
-        {% for report in reports %}
-            <li>{{ report.date_submitted }} - Commodity ID: {{ report.commodity_id }}, Used: {{ report.quantity_used }}, Received: {{ report.quantity_received }}, Balance: {{ report.balance }}</li>
-        {% endfor %}
+        <li><a href="#">Manage Commodities</a></li>
+        <li><a href="#">Manage Facilities</a></li>
+        <li><a href="#">Submit Report</a></li>
+        <li><a href="#">View Reports</a></li>
+        <li><a href="#">User Management</a></li>
     </ul>
+
+    <p><a href="{{ url_for('logout') }}">Logout</a></p>
 </body>
 </html>
