@@ -82,6 +82,15 @@ with app.app_context():
     db.create_all()
 
 with app.app_context():
+    user = User.query.filter_by(username='Keegan').first()
+    if user:
+        user.role = 'admin'
+        user.approved = True
+        db.session.commit()
+        print("✅ User 'Keegan' promoted to admin and approved!")
+
+
+with app.app_context():
     user = User.query.filter_by(username='YOUR_USERNAME').first()
     if user:
         user.role = 'admin'
