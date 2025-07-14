@@ -1,0 +1,21 @@
+<!-- templates/admin_dashboard.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard</title>
+</head>
+<body>
+    <h2>Admin Dashboard</h2>
+    <a href="{{ url_for('manage_users') }}">Manage Users</a> | 
+    <a href="{{ url_for('facilities') }}">Manage Facilities</a> | 
+    <a href="{{ url_for('commodities') }}">Manage Commodities</a> | 
+    <a href="{{ url_for('export_excel') }}">Export All Reports</a> | 
+    <a href="{{ url_for('logout') }}">Logout</a>
+    <h3>Facilities</h3>
+    <ul>
+        {% for facility in facilities %}
+            <li>{{ facility.name }}</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
