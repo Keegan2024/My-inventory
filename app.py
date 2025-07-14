@@ -77,9 +77,14 @@ def login():
             flash('Invalid username or password.', 'danger')
     return render_template('login.html')
 
+from flask import session
+
 @app.route('/dashboard')
 def dashboard():
-    return "Welcome to the dashboard! You are logged in."
+    username = session.get('username', 'Guest')
+    user = User.query.filter_by(username=username).first()
+    return render_template('dashboard.html', user=user)
+
 
 # ---------------------------
 # Database initialization
