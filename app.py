@@ -6,7 +6,6 @@ from datetime import datetime
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventory.db'
-
 db = SQLAlchemy(app)
 
 # ---------------------------
@@ -83,21 +82,26 @@ def dashboard():
     return "Welcome to the dashboard! You are logged in."
 
 # ---------------------------
-# Database initialization (run only once manually)
+# Database initialization
 # ---------------------------
+
+with app.app_context():
+    db.create_all()
+
+    # Create or update Keegan user
+    user = User.query.filter_by(username='Keegan').first()
+    if user:
+        user.password = generate_password_hash('44665085')
+        user.role = 'admin'
+        user.approved = True
+        db.session.commit()
+        print("✅ User 'Keegan' promoted to admin and password reset!")
+    else:
+        # Create Keegan if not found
+        new_user = User(username='Keegan', password=generate_password_hash('44665085'), role='admin', approved=True)
+        db.session.add(new_user)
+        db.session.commit()
+        print("✅ User 'Keegan' created as admin!")
+
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-
-        # Update existing user "Keegan" (optional)
-        user = User.query.filter_by(username='Keegan').first()
-        if user:
-            user.password = generate_password_hash('44665085')
-            user.role = 'admin'
-            user.approved = True
-            db.session.commit()
-            print("✅ User 'Keegan' promoted to admin and password reset!")
-        else:
-            print("❌ User 'Keegan' not found! Sign up first.")
-
     app.run(debug=True, host='0.0.0.0')
