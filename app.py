@@ -90,3 +90,17 @@ def signup():
         flash('Signup successful. Please wait for admin approval.', 'success')
         return redirect(url_for('login'))
     return render_template('signup.html')
+
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        hashed_pw = generate_password_hash(password)
+        user = User(username=username, password=hashed_pw, approved=False)
+        db.session.add(user)
+        db.session.commit()
+        flash('Signup successful. Please wait for admin approval.', 'success')
+        return redirect(url_for('login'))
+    return render_template('signup.html')
+
