@@ -1,7 +1,49 @@
-<h2>Login</h2>
-<form method="POST">
-    Username: <input type="text" name="username"><br>
-    Password: <input type="password" name="password"><br>
-    <button type="submit">Login</button>
-</form>
-<p>Don't have an account? <a href="{{ url_for('signup') }}">Sign up here</a></p>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login</title>
+    <style>
+        body {
+            background-color: #e0f0ff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        .login-box {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        img {
+            width: 100px;
+            margin-bottom: 20px;
+        }
+        input, button {
+            margin: 5px 0;
+            width: 100%;
+            padding: 10px;
+        }
+        a {
+            display: block;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <img src="{{ url_for('static', filename='drugs.png') }}" alt="Drugs">
+        <h2>Login</h2>
+        <form method="POST">
+            <input type="text" name="username" placeholder="Username" required><br>
+            <input type="password" name="password" placeholder="Password" required><br>
+            <button type="submit">Login</button>
+        </form>
+        <a href="#">Forgot password?</a>
+        <a href="{{ url_for('signup') }}">Signup</a>
+    </div>
+</body>
+</html>
