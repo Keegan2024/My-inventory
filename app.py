@@ -107,6 +107,16 @@ with app.app_context():
         db.session.add(new_user)
         db.session.commit()
         print("✅ User 'Keegan' created as admin!")
+        if user and check_password_hash(user.password, password):
+    if user.approved:
+        flash('Login successful!', 'success')
+        session['username'] = user.username   # ✅ Save username to session
+        return redirect(url_for('dashboard'))
+@app.route('/logout')
+def logout():
+    session.pop('username', None)
+    flash('Logged out successfully.', 'success')
+    return redirect(url_for('login'))
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
