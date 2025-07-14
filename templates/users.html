@@ -1,7 +1,17 @@
-<h2>User Management</h2>
-<ul>
-    {% for user in users %}
-        <li>{{ user.username }} - Role: {{ user.role }} - Approved: {{ user.approved }}</li>
-    {% endfor %}
-</ul>
-<a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Users</title>
+</head>
+<body>
+    <h2>All Users</h2>
+    <ul>
+        {% for u in users %}
+            <li>
+                {{ u.username }} — Role: {{ u.role }} — Approved: {{ u.approved }}
+            </li>
+        {% endfor %}
+    </ul>
+    <a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+</body>
+</html>
