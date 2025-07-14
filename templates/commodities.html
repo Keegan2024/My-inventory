@@ -1,14 +1,27 @@
-<h2>Commodities</h2>
-<ul>
-    {% for commodity in commodities %}
-        <li>{{ commodity.name }}</li>
-    {% endfor %}
-</ul>
-
-<h3>Add New Commodity</h3>
-<form method="POST">
-    Name: <input type="text" name="name">
-    <button type="submit">Add</button>
-</form>
-
-<a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Commodities</title>
+</head>
+<body>
+    <h2>Commodities</h2>
+    <form method="POST">
+        Name: <input type="text" name="name" required><br>
+        Description: <input type="text" name="description" required><br>
+        Unit: <input type="text" name="unit" required><br>
+        Balance Opening: <input type="number" name="balance_opening" required><br>
+        Received: <input type="number" name="received" required><br>
+        Given to Others: <input type="number" name="given_to_others" required><br>
+        Balance: <input type="number" name="balance" required><br>
+        Expiry Date: <input type="text" name="expiry_date" placeholder="YYYY-MM" required><br>
+        <button type="submit">Add Commodity</button>
+    </form>
+    <h3>List</h3>
+    <ul>
+        {% for c in commodities %}
+            <li>{{ c.name }} — {{ c.description }} — {{ c.unit }} — Bal: {{ c.balance }} — Exp: {{ c.expiry_date }}</li>
+        {% endfor %}
+    </ul>
+    <a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+</body>
+</html>
