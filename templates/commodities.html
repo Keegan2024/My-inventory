@@ -4,4 +4,11 @@
         <li>{{ commodity.name }}</li>
     {% endfor %}
 </ul>
+
+<h3>Add New Commodity</h3>
+<form method="POST">
+    Name: <input type="text" name="name">
+    <button type="submit">Add</button>
+</form>
+
 <a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
