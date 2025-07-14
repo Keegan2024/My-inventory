@@ -79,6 +79,19 @@ def dashboard():
     return "Welcome to the dashboard! You are logged in."
 
 with app.app_context():
+    from werkzeug.security import generate_password_hash
+
+with app.app_context():
+    user = User.query.filter_by(username='Keegan').first()
+    if user:
+        user.password = generate_password_hash('44665085')
+        user.role = 'admin'
+        user.approved = True
+        db.session.commit()
+        print("✅ User 'Keegan' promoted to admin and password reset!")
+    else:
+        print("❌ User 'Keegan' not found! Please sign up first.")
+
     db.create_all()
 
 with app.app_context():
