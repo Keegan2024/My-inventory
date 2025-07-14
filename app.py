@@ -79,6 +79,9 @@ def dashboard():
     return "Welcome to the dashboard! You are logged in."
 
 with app.app_context():
+     db.create_all()
+
+with app.app_context():
     from werkzeug.security import generate_password_hash
 
 with app.app_context():
@@ -92,9 +95,6 @@ with app.app_context():
     else:
         print("❌ User 'Keegan' not found! Please sign up first.")
 
-    db.create_all()
-
-with app.app_context():
     user = User.query.filter_by(username='Keegan').first()
     if user:
         user.role = 'admin'
