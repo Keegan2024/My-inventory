@@ -4,3 +4,4 @@ werkzeug
 pandas
 openpyxl
 weasyprint
+gunicorn
