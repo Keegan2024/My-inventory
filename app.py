@@ -77,3 +77,6 @@ def login():
 @app.route('/dashboard')
 def dashboard():
     return "Welcome to the dashboard! You are logged in."
+
+with app.app_context():
+    db.create_all()
