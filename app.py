@@ -42,23 +42,15 @@ class Report(db.Model):
     expiry_date = db.Column(db.String(20), nullable=False)
     date_submitted = db.Column(db.DateTime, default=datetime.utcnow)
 
-@app.route('/')
-def index():
-    return redirect(url_for('login'))
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        user = User.query.filter_by(username=username).first()
-        if user and check_password_hash(user.password, password):
-            if user.approved:
-                session['user_id'] = user.id
-                session['role'] = user.role
-                return redirect(url_for('dashboard'))
-            else:
-                flash('Your account is not approved yet.', 'warning')
-        else:
-            flash('Invalid credentials.', 'danger')
-    return render_template('login.html')
+        hashed_pw = generate_password_hash(password)
+        user = User(username=username, password=hashed_pw, approved=False)
+        db.session.add(user)
+        db.session.commit()
+        flash('Signup successful. Please wait for admin approval.', 'success')
+        return redirect(url_for('login'))
+    return render_template('signup.html')
