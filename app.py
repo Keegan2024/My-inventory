@@ -54,3 +54,26 @@ def signup():
         flash('Signup successful. Please wait for admin approval.', 'success')
         return redirect(url_for('login'))
     return render_template('signup.html')
+@app.route('/')
+def index():
+    return redirect(url_for('login'))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        user = User.query.filter_by(username=username).first()
+        if user and check_password_hash(user.password, password):
+            if user.approved:
+                flash('Login successful!', 'success')
+                return redirect(url_for('dashboard'))  # Change to your desired page
+            else:
+                flash('Account not yet approved by admin.', 'danger')
+        else:
+            flash('Invalid username or password.', 'danger')
+    return render_template('login.html')
+
+@app.route('/dashboard')
+def dashboard():
+    return "Welcome to the dashboard! You are logged in."
