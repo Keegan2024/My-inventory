@@ -62,4 +62,3 @@ def login():
         else:
             flash('Invalid credentials.', 'danger')
     return render_template('login.html')
-
