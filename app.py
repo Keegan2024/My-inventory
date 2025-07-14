@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, request, flash
+from flask import Flask, render_template, redirect, url_for, request, flash, session
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
@@ -70,6 +70,7 @@ def login():
         if user and check_password_hash(user.password, password):
             if user.approved:
                 flash('Login successful!', 'success')
+                session['username'] = user.username  # ✅ Save username to session
                 return redirect(url_for('dashboard'))
             else:
                 flash('Account not yet approved by admin.', 'danger')
@@ -77,46 +78,20 @@ def login():
             flash('Invalid username or password.', 'danger')
     return render_template('login.html')
 
-from flask import session
-
 @app.route('/dashboard')
 def dashboard():
     username = session.get('username', 'Guest')
     user = User.query.filter_by(username=username).first()
     return render_template('dashboard.html', user=user)
 
-
-# ---------------------------
-# Database initialization
-# ---------------------------
-
-with app.app_context():
-    db.create_all()
-
-    # Create or update Keegan user
-    user = User.query.filter_by(username='Keegan').first()
-    if user:
-        user.password = generate_password_hash('44665085')
-        user.role = 'admin'
-        user.approved = True
-        db.session.commit()
-        print("✅ User 'Keegan' promoted to admin and password reset!")
-    else:
-        # Create Keegan if not found
-        new_user = User(username='Keegan', password=generate_password_hash('44665085'), role='admin', approved=True)
-        db.session.add(new_user)
-        db.session.commit()
-        print("✅ User 'Keegan' created as admin!")
-        if user and check_password_hash(user.password, password):
-    if user.approved:
-        flash('Login successful!', 'success')
-        session['username'] = user.username   # ✅ Save username to session
-        return redirect(url_for('dashboard'))
 @app.route('/logout')
 def logout():
     session.pop('username', None)
     flash('Logged out successfully.', 'success')
     return redirect(url_for('login'))
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0')
+# ---------------------------
+# Database initialization
+# ---------------------------
+
+with app.app_con_
