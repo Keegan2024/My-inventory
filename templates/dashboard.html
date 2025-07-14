@@ -1,20 +1,9 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Dashboard</title>
-</head>
-<body>
-    <h1>Welcome to the Dashboard!</h1>
-    <p>You are logged in as {{ user.username }} (Role: {{ user.role }})</p>
-
-    <ul>
-        <li><a href="#">Manage Commodities</a></li>
-        <li><a href="#">Manage Facilities</a></li>
-        <li><a href="#">Submit Report</a></li>
-        <li><a href="#">View Reports</a></li>
-        <li><a href="#">User Management</a></li>
-    </ul>
-
-    <p><a href="{{ url_for('logout') }}">Logout</a></p>
-</body>
-</html>
+<h1>Welcome to the Dashboard, {{ user.username }}!</h1>
+<ul>
+    <li><a href="{{ url_for('manage_commodities') }}">Manage Commodities</a></li>
+    <li><a href="{{ url_for('manage_facilities') }}">Manage Facilities</a></li>
+    <li><a href="{{ url_for('submit_report') }}">Submit Report</a></li>
+    <li><a href="{{ url_for('view_reports') }}">View Reports</a></li>
+    <li><a href="{{ url_for('manage_users') }}">User Management</a></li>
+</ul>
+<a href="{{ url_for('logout') }}">Logout</a>
