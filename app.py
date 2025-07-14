@@ -1,13 +1,12 @@
-from flask import Flask, render_template, redirect, url_for, request, flash, session, send_file
+from flask import Flask, render_template, redirect, url_for, request, flash
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
-import pandas as pd
-import io
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventory.db'
+
 db = SQLAlchemy(app)
 
 # ---------------------------
@@ -42,6 +41,10 @@ class Report(db.Model):
     expiry_date = db.Column(db.String(20), nullable=False)
     date_submitted = db.Column(db.DateTime, default=datetime.utcnow)
 
+# ---------------------------
+# Routes
+# ---------------------------
+
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
@@ -54,6 +57,7 @@ def signup():
         flash('Signup successful. Please wait for admin approval.', 'success')
         return redirect(url_for('login'))
     return render_template('signup.html')
+
 @app.route('/')
 def index():
     return redirect(url_for('login'))
@@ -67,7 +71,7 @@ def login():
         if user and check_password_hash(user.password, password):
             if user.approved:
                 flash('Login successful!', 'success')
-                return redirect(url_for('dashboard'))  # Change to your desired page
+                return redirect(url_for('dashboard'))
             else:
                 flash('Account not yet approved by admin.', 'danger')
         else:
@@ -78,35 +82,22 @@ def login():
 def dashboard():
     return "Welcome to the dashboard! You are logged in."
 
-with app.app_context():
-     db.create_all()
+# ---------------------------
+# Database initialization (run only once manually)
+# ---------------------------
+if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
 
-with app.app_context():
-    from werkzeug.security import generate_password_hash
+        # Update existing user "Keegan" (optional)
+        user = User.query.filter_by(username='Keegan').first()
+        if user:
+            user.password = generate_password_hash('44665085')
+            user.role = 'admin'
+            user.approved = True
+            db.session.commit()
+            print("✅ User 'Keegan' promoted to admin and password reset!")
+        else:
+            print("❌ User 'Keegan' not found! Sign up first.")
 
-with app.app_context():
-    user = User.query.filter_by(username='Keegan').first()
-    if user:
-        user.password = generate_password_hash('44665085')
-        user.role = 'admin'
-        user.approved = True
-        db.session.commit()
-        print("✅ User 'Keegan' promoted to admin and password reset!")
-    else:
-        print("❌ User 'Keegan' not found! Please sign up first.")
-
-    user = User.query.filter_by(username='Keegan').first()
-    if user:
-        user.role = 'admin'
-        user.approved = True
-        db.session.commit()
-        print("✅ User 'Keegan' promoted to admin and approved!")
-
-
-with app.app_context():
-    user = User.query.filter_by(username='YOUR_USERNAME').first()
-    if user:
-        user.role = 'admin'
-        user.approved = True
-        db.session.commit()
-        print("✅ User promoted to admin!")
+    app.run(debug=True, host='0.0.0.0')
