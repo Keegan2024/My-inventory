@@ -94,4 +94,20 @@ def logout():
 # Database initialization
 # ---------------------------
 
-with app.app_con_
+with app.app_context():
+    db.create_all()
+
+    # Create or update Keegan user
+    user = User.query.filter_by(username='Keegan').first()
+    if user:
+        user.password = generate_password_hash('44665085')
+        user.role = 'admin'
+        user.approved = True
+        db.session.commit()
+        print("✅ User 'Keegan' promoted to admin and password reset!")
+    else:
+        new_user = User(username='Keegan', password=generate_password_hash('44665085'), role='admin', approved=True)
+        db.session.add(new_user)
+        db.session.commit()
+        print("✅ User 'Keegan' created as admin!")
+
