@@ -1,20 +1,7 @@
-<!-- templates/commodities.html -->
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Manage Commodities</title>
-</head>
-<body>
-    <h2>Manage Commodities</h2>
-    <a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
-    <form method="POST">
-        <input type="text" name="name" placeholder="Commodity Name" required>
-        <button type="submit">Add Commodity</button>
-    </form>
-    <ul>
-        {% for commodity in commodities %}
-            <li>{{ commodity.name }}</li>
-        {% endfor %}
-    </ul>
-</body>
-</html>
+<h2>Commodities</h2>
+<ul>
+    {% for commodity in commodities %}
+        <li>{{ commodity.name }}</li>
+    {% endfor %}
+</ul>
+<a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
