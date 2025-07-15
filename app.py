@@ -50,27 +50,6 @@ def home():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-@app.route('/reports')
-def reports():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    return render_template('reports.html', user=User.query.get(session['user_id']))
-
-@app.route('/inventory')
-def inventory():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    return render_template('inventory.html', user=User.query.get(session['user_id']))
-
-@app.route('/settings')
-def settings():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    return render_template('settings.html', user=User.query.get(session['user_id']))
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
     if 'user_id' in session:
         return redirect(url_for('dashboard'))
     
@@ -108,6 +87,24 @@ def dashboard():
         return redirect(url_for('login'))
     user = User.query.get(session['user_id'])
     return render_template('dashboard.html', user=user)
+
+@app.route('/reports')
+def reports():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('reports.html', user=User.query.get(session['user_id']))
+
+@app.route('/inventory')
+def inventory():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('inventory.html', user=User.query.get(session['user_id']))
+
+@app.route('/settings')
+def settings():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('settings.html', user=User.query.get(session['user_id']))
 
 @app.route('/logout')
 def logout():
