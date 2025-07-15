@@ -109,6 +109,11 @@ def logout():
     session.pop('username', None)
     flash('Logged out.', 'success')
     return redirect(url_for('login'))
+@app.route('/dashboard')
+def dashboard():
+    username = session.get('username', 'Guest')
+    user = User.query.filter_by(username=username).first()
+    return render_template('dashboard.html', user=user)
 
 # ---------------------------
 # Dashboard
