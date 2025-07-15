@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Submit Report</h2>
+
+<form method="post">
+    <label for="facility">Facility:</label>
+    <select name="facility_id" required>
+        {% for facility in facilities %}
+        <option value="{{ facility.id }}">{{ facility.name }}</option>
+        {% endfor %}
+    </select>
+    <br>
+
+    <label for="commodity">Commodity:</label>
+    <select name="commodity_id" required>
+        {% for commodity in commodities %}
+        <option value="{{ commodity.id }}">{{ commodity.name }}</option>
+        {% endfor %}
+    </select>
+    <br>
+
+    <label for="quantity_used">Quantity Used:</label>
+    <input type="number" name="quantity_used" required><br>
+
+    <label for="quantity_received">Quantity Received:</label>
+    <input type="number" name="quantity_received" required><br>
+
+    <label for="balance">Balance:</label>
+    <input type="number" name="balance" required><br>
+
+    <label for="expiry_date">Expiry Date:</label>
+    <input type="date" name="expiry_date" required><br>
+
+    <button type="submit">Submit Report</button>
+</form>
+{% endblock %}
