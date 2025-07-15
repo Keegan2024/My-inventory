@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Edit Facility: {{ facility.name }}</h2>
+
+<form method="post" action="{{ url_for('edit_facility', facility_id=facility.id) }}">
+    <div class="mb-3">
+        <label for="name" class="form-label">Facility Name</label>
+        <input type="text" name="name" id="name" class="form-control" value="{{ facility.name }}" required>
+    </div>
+    <div class="mb-3">
+        <label for="province" class="form-label">Province</label>
+        <input type="text" name="province" id="province" class="form-control" value="{{ facility.province }}" required>
+    </div>
+    <div class="mb-3">
+        <label for="district" class="form-label">District</label>
+        <input type="text" name="district" id="district" class="form-control" value="{{ facility.district }}" required>
+    </div>
+    <div class="mb-3">
+        <label for="hub" class="form-label">Hub (optional)</label>
+        <input type="text" name="hub" id="hub" class="form-control" value="{{ facility.hub or '' }}">
+    </div>
+    <button type="submit" class="btn btn-primary">Update Facility</button>
+    <a href="{{ url_for('facilities') }}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}
