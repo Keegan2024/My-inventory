@@ -66,7 +66,6 @@ def initialize_database():
     with app.app_context():
         db.create_all()
         
-        # Create admin user if not exists
         if not User.query.filter_by(username='admin').first():
             try:
                 admin_facility = Facility(name='Provincial Health Office', district='Luapula')
@@ -84,9 +83,8 @@ def initialize_database():
                 db.session.commit()
             except SQLAlchemyError as e:
                 db.session.rollback()
-                app.logger.error(f"Failed to create admin user: {str(e)}")
+                app.logger.error(f"Admin creation failed: {str(e)}")
 
-        # Create facilities if not exists
         if not Facility.query.first():
             try:
                 districts = {
@@ -94,16 +92,14 @@ def initialize_database():
                     'Samfya': ['Samfya District Hospital', 'Mambilima Mission Hospital'],
                     'Kawambwa': ['Kawambwa District Hospital', 'St. Paul\'s Mission Hospital']
                 }
-                
                 for district, facilities in districts.items():
                     for facility_name in facilities:
                         db.session.add(Facility(name=facility_name, district=district))
                 db.session.commit()
             except SQLAlchemyError as e:
                 db.session.rollback()
-                app.logger.error(f"Failed to create facilities: {str(e)}")
+                app.logger.error(f"Facility creation failed: {str(e)}")
 
-        # Create commodities if not exists
         if not Commodity.query.first():
             try:
                 commodities = [
@@ -115,9 +111,9 @@ def initialize_database():
                 db.session.commit()
             except SQLAlchemyError as e:
                 db.session.rollback()
-                app.logger.error(f"Failed to create commodities: {str(e)}")
+                app.logger.error(f"Commodity creation failed: {str(e)}")
 
-# Initialize the database when app starts
+# Initialize the database
 with app.app_context():
     initialize_database()
 
@@ -193,6 +189,97 @@ def dashboard():
     user = User.query.get(session['user_id'])
     reports = Report.query.filter_by(facility_id=user.facility_id).order_by(Report.report_date.desc()).limit(5).all()
     return render_template('dashboard.html', user=user, reports=reports))
+
+@app.route('/submit-report', methods=['GET', 'POST'])
+def submit_report():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    user = User.query.get(session['user_id'])
+    commodities = Commodity.query.filter_by(active=True).order_by(Commodity.name).all()
+    
+    if request.method == 'POST':
+        try:
+            report_date_str = request.form.get('report_date', '')
+            if not report_date_str:
+                flash('Report date is required', 'danger')
+                return render_template('submit_report.html', commodities=commodities, user=user)
+            
+            try:
+                report_date = datetime.strptime(report_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                flash('Invalid date format. Use YYYY-MM-DD', 'danger')
+                return render_template('submit_report.html', commodities=commodities, user=user)
+            
+            report_period = request.form.get('report_period', 'weekly')
+            if report_period not in ['weekly', 'monthly', 'quarterly']:
+                flash('Invalid report period', 'danger')
+                return render_template('submit_report.html', commodities=commodities, user=user)
+            
+            items = []
+            for commodity in commodities:
+                commodity_id = str(commodity.id)
+                try:
+                    items.append({
+                        'commodity_id': commodity_id,
+                        'opening_balance': request.form.get(f'opening_balance_{commodity_id}', '0'),
+                        'received': request.form.get(f'received_{commodity_id}', '0'),
+                        'used': request.form.get(f'used_{commodity_id}', '0'),
+                        'closing_balance': request.form.get(f'closing_balance_{commodity_id}', '0'),
+                        'exp_date': request.form.get(f'exp_date_{commodity_id}', ''),
+                        'remarks': request.form.get(f'remarks_{commodity_id}', '')
+                    })
+                except ValueError:
+                    flash(f'Invalid values for commodity {commodity.name}', 'danger')
+                    return render_template('submit_report.html', commodities=commodities, user=user)
+            
+            validation_errors = validate_report_items(items, user.facility_id)
+            if validation_errors:
+                for error in validation_errors:
+                    flash(error, 'danger')
+                return render_template('submit_report.html', commodities=commodities, user=user, form_data=request.form)
+            
+            report = Report(
+                facility_id=user.facility_id,
+                user_id=user.id,
+                report_date=report_date,
+                report_period=report_period
+            )
+            db.session.add(report)
+            db.session.flush()
+            
+            for item in items:
+                report_item = ReportItem(
+                    report_id=report.id,
+                    commodity_id=int(item['commodity_id']),
+                    opening_balance=int(item['opening_balance']),
+                    received=int(item['received']),
+                    used=int(item['used']),
+                    closing_balance=int(item['closing_balance']),
+                    exp_date=item['exp_date'],
+                    remarks=item['remarks']
+                )
+                db.session.add(report_item)
+            
+            db.session.commit()
+            flash('Report submitted successfully!', 'success')
+            return redirect(url_for('dashboard'))
+        
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            flash(f'Database error: {str(e)}', 'danger')
+        except Exception as e:
+            flash(f'Error submitting report: {str(e)}', 'danger')
+    
+    form_data = {}
+    for commodity in commodities:
+        prev_report = get_previous_report(user.facility_id, commodity.id)
+        if prev_report:
+            form_data[f'opening_balance_{commodity.id}'] = prev_report.closing_balance
+    
+    return render_template('submit_report.html', commodities=commodities, user=user, form_data=form_data)
+
+# Add other routes here...
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
