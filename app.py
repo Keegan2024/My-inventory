@@ -1,235 +1,226 @@
-"""
-Inventory Management System for Healthcare Facilities
-
-Features:
-- User authentication and role-based access control
-- Commodity tracking with usage reporting
-- Facility management
-- Data export functionality
-- Administrative controls
-
-Security Note: This version includes security improvements but still requires
-proper deployment configuration (HTTPS, secret management, etc.) for production use.
-"""
-
-import os
-from datetime import datetime
-from io import BytesIO
-
-import pandas as pd
-from flask import (
-    Flask,
-    abort,
-    flash,
-    make_response,
-    redirect,
-    render_template,
-    request,
-    session,
-    url_for,
-)
+from flask import Flask, render_template, redirect, url_for, request, flash, session, abort, make_response
 from flask_sqlalchemy import SQLAlchemy
-from werkzeug.security import check_password_hash, generate_password_hash
-from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
+import pandas as pd
+import io
+import os
 
-# Configuration
-class Config:
-    SECRET_KEY = os.environ.get("SECRET_KEY", "dev-key-change-in-production")
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
-        "DATABASE_URL", "sqlite:///inventory.db"
-    )
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-    ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
-    ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
-    DATA_DIR = "data"
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB upload limit
+app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///inventory.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
 
-
-# Application Factory
-def create_app(config_class=Config):
-    app = Flask(__name__)
-    app.config.from_object(config_class)
-
-    # Initialize extensions
-    db.init_app(app)
-
-    # Register blueprints
-    from app.auth import auth_bp
-    from app.main import main_bp
-    from app.admin import admin_bp
-    from app.reports import reports_bp
-
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(main_bp)
-    app.register_blueprint(admin_bp, url_prefix="/admin")
-    app.register_blueprint(reports_bp, url_prefix="/reports")
-
-    # CLI commands
-    @app.cli.command("init-db")
-    def init_db():
-        """Initialize the database with sample data"""
-        db.create_all()
-        load_sample_data()
-        print("Database initialized successfully.")
-
-    return app
-
-
-# Extensions
-db = SQLAlchemy()
-
-# Models
 class Facility(db.Model):
-    """Healthcare facility model"""
-
-    __tablename__ = "facilities"
-
     id = db.Column(db.Integer, primary_key=True)
     country = db.Column(db.String(100), nullable=False, default="Zambia")
-    province = db.Column(db.String(100), nullable=False, index=True)
-    district = db.Column(db.String(100), nullable=False, index=True)
+    province = db.Column(db.String(100), nullable=False)
+    district = db.Column(db.String(100), nullable=False)
     hub = db.Column(db.String(100), nullable=True)
-    name = db.Column(db.String(100), nullable=False, unique=True, index=True)
-    users = db.relationship("User", backref="facility", lazy=True)
-    reports = db.relationship("Report", backref="facility", lazy=True)
-
-    def __repr__(self):
-        return f"<Facility {self.name}>"
-
+    name = db.Column(db.String(100), nullable=False)
+    users = db.relationship('User', backref='facility', lazy=True)
 
 class Commodity(db.Model):
-    """Medical commodity model"""
-
-    __tablename__ = "commodities"
-
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False, unique=True, index=True)
-    description = db.Column(db.String(200))
-    category = db.Column(db.String(100), index=True)
-    reports = db.relationship("Report", backref="commodity", lazy=True)
-
-    def __repr__(self):
-        return f"<Commodity {self.name}>"
-
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.String(200), nullable=True)
+    category = db.Column(db.String(100), nullable=True)
 
 class User(db.Model):
-    """System user model"""
-
-    __tablename__ = "users"
-
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    username = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
-    role = db.Column(db.String(20), default="user", index=True)
-    approved = db.Column(db.Boolean, default=False, index=True)
-    facility_id = db.Column(db.Integer, db.ForeignKey("facilities.id"))
-    last_login = db.Column(db.DateTime)
-    reports = db.relationship("Report", backref="user", lazy=True)
-
-    ROLES = ["user", "facility_admin", "system_admin"]
-
-    def __repr__(self):
-        return f"<User {self.username}>"
-
-    def has_role(self, role_name):
-        """Check if user has specified role"""
-        return self.role == role_name
-
-    def can_access_facility(self, facility_id):
-        """Check if user can access a specific facility"""
-        if self.has_role("system_admin"):
-            return True
-        return self.facility_id == facility_id
-
+    role = db.Column(db.String(20), default='user')
+    approved = db.Column(db.Boolean, default=False)
+    facility_id = db.Column(db.Integer, db.ForeignKey('facility.id'), nullable=True)
 
 class Report(db.Model):
-    """Inventory report model"""
-
-    __tablename__ = "reports"
-
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    facility_id = db.Column(db.Integer, db.ForeignKey("facilities.id"), nullable=False)
-    commodity_id = db.Column(db.Integer, db.ForeignKey("commodities.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    facility_id = db.Column(db.Integer, db.ForeignKey('facility.id'), nullable=False)
+    commodity_id = db.Column(db.Integer, db.ForeignKey('commodity.id'), nullable=False)
     quantity_used = db.Column(db.Integer, nullable=False)
     quantity_received = db.Column(db.Integer, nullable=False)
     balance = db.Column(db.Integer, nullable=False)
-    expiry_date = db.Column(db.Date, nullable=True)
-    date_submitted = db.Column(db.DateTime, default=datetime.utcnow, index=True)
-    notes = db.Column(db.Text)
+    expiry_date = db.Column(db.String(20), nullable=False)
+    date_submitted = db.Column(db.DateTime, default=datetime.utcnow)
+    facility = db.relationship('Facility')
+    commodity = db.relationship('Commodity')
 
-    def __repr__(self):
-        return f"<Report {self.id} for {self.commodity.name}>"
+@app.route('/')
+def index():
+    return redirect(url_for('login'))
 
-
-# Helper Functions
-def load_sample_data():
-    """Load initial sample data into the database"""
-    try:
-        # Create default admin user
-        if not User.query.filter_by(username=Config.ADMIN_USERNAME).first():
-            admin = User(
-                username=Config.ADMIN_USERNAME,
-                password=generate_password_hash(Config.ADMIN_PASSWORD),
-                role="system_admin",
-                approved=True,
-            )
-            db.session.add(admin)
-
-        # Load facilities from CSV if none exist
-        if Facility.query.count() == 0:
-            facilities_path = os.path.join(Config.DATA_DIR, "zambia_facilities.csv")
-            if os.path.exists(facilities_path):
-                df = pd.read_csv(facilities_path)
-                for _, row in df.iterrows():
-                    facility = Facility(
-                        country=row.get("Country", "Zambia"),
-                        province=row["Province"],
-                        district=row["District"],
-                        hub=row.get("Hub"),
-                        name=row["FacilityName"],
-                    )
-                    db.session.add(facility)
-
-        # Load commodities from CSV if none exist
-        if Commodity.query.count() == 0:
-            commodities_path = os.path.join(Config.DATA_DIR, "commodities.csv")
-            if os.path.exists(commodities_path):
-                df = pd.read_csv(commodities_path)
-                for _, row in df.iterrows():
-                    commodity = Commodity(
-                        name=row["Name"],
-                        description=row.get("Description"),
-                        category=row.get("Category"),
-                    )
-                    db.session.add(commodity)
-
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        hashed_pw = generate_password_hash(password)
+        user = User(username=username, password=hashed_pw, approved=False)
+        db.session.add(user)
         db.session.commit()
-    except Exception as e:
-        db.session.rollback()
-        print(f"Error loading sample data: {str(e)}")
+        flash('Signup successful. Please wait for admin approval.', 'success')
+        return redirect(url_for('login'))
+    return render_template('signup.html')
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        user = User.query.filter_by(username=username).first()
+        if user and check_password_hash(user.password, password):
+            if user.approved:
+                session['username'] = user.username
+                flash('Login successful!', 'success')
+                return redirect(url_for('dashboard'))
+            else:
+                flash('Account not yet approved by admin.', 'danger')
+        else:
+            flash('Invalid username or password.', 'danger')
+    return render_template('login.html')
 
-# Create application
-app = create_app()
+@app.route('/dashboard')
+def dashboard():
+    username = session.get('username')
+    if not username:
+        flash('Please log in.', 'warning')
+        return redirect(url_for('login'))
+    user = User.query.filter_by(username=username).first()
+    facilities = Facility.query.all()
+    return render_template('dashboard.html', user=user, facilities=facilities)
 
+@app.route('/reports')
+def reports():
+    username = session.get('username')
+    if not username:
+        flash('Please log in.', 'warning')
+        return redirect(url_for('login'))
+    user = User.query.filter_by(username=username).first()
+    user_reports = Report.query
+    facility_name = request.args.get('facility')
+    commodity_name = request.args.get('commodity')
+    date_str = request.args.get('date')
+    if facility_name:
+        user_reports = user_reports.join(Facility).filter(Facility.name.ilike(f"%{facility_name}%"))
+    if commodity_name:
+        user_reports = user_reports.join(Commodity).filter(Commodity.name.ilike(f"%{commodity_name}%"))
+    if date_str:
+        try:
+            date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+            user_reports = user_reports.filter(db.func.date(Report.date_submitted) == date_obj.date())
+        except:
+            flash('Invalid date format', 'danger')
+    user_reports = user_reports.all()
+    return render_template('reports.html', user=user, reports=user_reports)
 
-# Error Handlers
-@app.errorhandler(403)
-def forbidden(error):
-    return render_template("errors/403.html"), 403
+@app.route('/submit_report', methods=['GET', 'POST'])
+def submit_report():
+    username = session.get('username')
+    if not username:
+        flash('Please log in.', 'warning')
+        return redirect(url_for('login'))
+    user = User.query.filter_by(username=username).first()
+    facility = Facility.query.first()
+    commodities = Commodity.query.all()
+    for commodity in commodities:
+        last_report = Report.query.filter_by(facility_id=facility.id, commodity_id=commodity.id).order_by(Report.date_submitted.desc()).first()
+        commodity.opening_balance = last_report.balance if last_report else 0
+    if request.method == 'POST':
+        for commodity in commodities:
+            opening_balance = int(request.form.get(f'opening_balance_{commodity.id}', 0))
+            quantity_received = int(request.form.get(f'quantity_received_{commodity.id}', 0))
+            quantity_used = int(request.form.get(f'quantity_used_{commodity.id}', 0))
+            balance = opening_balance + quantity_received - quantity_used
+            expiry_date = request.form.get(f'expiry_date_{commodity.id}', '')
+            report = Report(
+                user_id=user.id,
+                facility_id=facility.id,
+                commodity_id=commodity.id,
+                quantity_received=quantity_received,
+                quantity_used=quantity_used,
+                balance=balance,
+                expiry_date=expiry_date
+            )
+            db.session.add(report)
+        db.session.commit()
+        flash('Report submitted successfully.', 'success')
+        return redirect(url_for('dashboard'))
+    return render_template('submit_report.html', user=user, facility=facility, commodities=commodities)
 
+@app.route('/download_reports')
+def download_reports():
+    username = session.get('username')
+    if not username:
+        flash('Please log in.', 'warning')
+        return redirect(url_for('login'))
+    reports = Report.query.all()
+    if not reports:
+        flash('No reports to download.', 'warning')
+        return redirect(url_for('reports'))
+    data = []
+    for r in reports:
+        data.append({
+            'Facility': r.facility.name if r.facility else '',
+            'Commodity': r.commodity.name if r.commodity else '',
+            'Quantity Used': r.quantity_used,
+            'Quantity Received': r.quantity_received,
+            'Balance': r.balance,
+            'Expiry Date': r.expiry_date,
+            'Submitted On': r.date_submitted.strftime('%Y-%m-%d'),
+        })
+    df = pd.DataFrame(data)
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='Reports')
+    output.seek(0)
+    response = make_response(output.read())
+    response.headers["Content-Disposition"] = "attachment; filename=reports.xlsx"
+    response.headers["Content-type"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    return response
 
-@app.errorhandler(404)
-def not_found(error):
-    return render_template("errors/404.html"), 404
+@app.route('/logout')
+def logout():
+    session.pop('username', None)
+    flash('Logged out successfully.', 'success')
+    return redirect(url_for('login'))
 
+with app.app_context():
+    db.create_all()
+    if Facility.query.count() == 0:
+        df = pd.read_csv('zambia_facilities.csv')
+        for _, row in df.iterrows():
+            f = Facility(
+                country=row['Country'],
+                province=row['Province'],
+                hub=row['Hub'] if not pd.isna(row['Hub']) else None,
+                district=row['District'],
+                name=row['FacilityName']
+            )
+            db.session.add(f)
+        db.session.commit()
+    if Commodity.query.count() == 0:
+        df_c = pd.read_csv('commodities.csv')
+        for _, row in df_c.iterrows():
+            c = Commodity(
+                name=row['Name'],
+                description=row['Description'],
+                category=row['Category']
+            )
+            db.session.add(c)
+        db.session.commit()
+    admin_user = User.query.filter_by(username='Keegan').first()
+    if admin_user:
+        admin_user.password = generate_password_hash('44665085')
+        admin_user.role = 'master_admin'
+        admin_user.approved = True
+        db.session.commit()
+    else:
+        new_admin = User(username='Keegan', password=generate_password_hash('44665085'), role='master_admin', approved=True)
+        db.session.add(new_admin)
+        db.session.commit()
 
-@app.errorhandler(500)
-def internal_error(error):
-    db.session.rollback()
-    return render_template("errors/500.html"), 500
-
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0')
