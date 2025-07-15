@@ -7,8 +7,6 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventory.db'
 db = SQLAlchemy(app)
-app.config['DEBUG'] = True
-app.config['PROPAGATE_EXCEPTIONS'] = True
 
 # ---------------------------
 # Database models
@@ -64,20 +62,6 @@ def signup():
         return redirect(url_for('login'))
     return render_template('signup.html')
 
-@app.route('/commodities')
-def commodities():
-    username = session.get('username')
-    if not username:
-        flash('Please log in.', 'warning')
-        return redirect(url_for('login'))
-    user = User.query.filter_by(username=username).first()
-    if not user:
-        flash('User not found.', 'danger')
-        return redirect(url_for('login'))
-
-    all_commodities = Commodity.query.all()
-    return render_template('commodities.html', user=user, commodities=all_commodities)
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -112,7 +96,7 @@ def users():
         flash('Please log in.', 'warning')
         return redirect(url_for('login'))
     user = User.query.filter_by(username=username).first()
-    if user.role != 'admin' and user.role != 'master_admin':
+    if user.role not in ['admin', 'master_admin']:
         flash('Unauthorized access.', 'danger')
         return redirect(url_for('dashboard'))
     users = User.query.all()
@@ -133,6 +117,40 @@ def reject_user(user_id):
     db.session.commit()
     flash(f'User {user.username} rejected and deleted!', 'danger')
     return redirect(url_for('users'))
+
+@app.route('/commodities')
+def commodities():
+    username = session.get('username')
+    if not username:
+        flash('Please log in.', 'warning')
+        return redirect(url_for('login'))
+    user = User.query.filter_by(username=username).first()
+    all_commodities = Commodity.query.all()
+    return render_template('commodities.html', user=user, commodities=all_commodities)
+
+@app.route('/facilities', methods=['GET', 'POST'])
+def facilities():
+    username = session.get('username')
+    if not username:
+        flash('Please log in.', 'warning')
+        return redirect(url_for('login'))
+    user = User.query.filter_by(username=username).first()
+    if user.role not in ['admin', 'master_admin']:
+        flash('Unauthorized access.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    all_facilities = Facility.query.all()
+
+    if request.method == 'POST':
+        name = request.form['name']
+        if name:
+            new_facility = Facility(name=name)
+            db.session.add(new_facility)
+            db.session.commit()
+            flash('Facility added successfully.', 'success')
+            return redirect(url_for('facilities'))
+
+    return render_template('facilities.html', user=user, facilities=all_facilities)
 
 @app.route('/logout')
 def logout():
