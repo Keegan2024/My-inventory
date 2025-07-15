@@ -62,6 +62,33 @@ def signup():
         return redirect(url_for('login'))
     return render_template('signup.html')
 
+@app.route('/submit_report')
+def submit_report():
+    username = session.get('username')
+    if not username:
+        flash('Please log in.', 'warning')
+        return redirect(url_for('login'))
+    user = User.query.filter_by(username=username).first()
+    return render_template('submit_report.html', user=user)
+
+@app.route('/reports')
+def reports():
+    username = session.get('username')
+    if not username:
+        flash('Please log in.', 'warning')
+        return redirect(url_for('login'))
+    user = User.query.filter_by(username=username).first()
+    return render_template('reports.html', user=user)
+
+@app.route('/help')
+def help_page():
+    username = session.get('username')
+    if not username:
+        flash('Please log in.', 'warning')
+        return redirect(url_for('login'))
+    return render_template('help.html', user=user)
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
