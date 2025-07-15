@@ -1,27 +1,42 @@
 {% extends 'base.html' %}
+
 {% block content %}
-<h1>Submit Report</h1>
-<form method="post">
-    <div class="mb-3">
-        <label>Commodity</label>
-        <select name="commodity_id" class="form-control" required>
-            {% for commodity in commodities %}
-            <option value="{{ commodity.id }}">{{ commodity.name }}</option>
-            {% endfor %}
-        </select>
-    </div>
-    <div class="mb-3">
-        <input type="number" name="quantity_used" class="form-control" placeholder="Quantity Used" required>
-    </div>
-    <div class="mb-3">
-        <input type="number" name="quantity_received" class="form-control" placeholder="Quantity Received" required>
-    </div>
-    <div class="mb-3">
-        <input type="number" name="balance" class="form-control" placeholder="Balance" required>
-    </div>
-    <div class="mb-3">
-        <input type="text" name="expiry_date" class="form-control" placeholder="Expiry Date" required>
-    </div>
-    <button type="submit" class="btn btn-success">Submit</button>
-</form>
+<div class="container">
+    <h2>Submit New Report</h2>
+    <form method="post">
+        <div class="mb-3">
+            <label for="facility">Facility</label>
+            <select class="form-control" name="facility_id" required>
+                {% for f in facilities %}
+                    <option value="{{ f.id }}">{{ f.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="commodity">Commodity</label>
+            <select class="form-control" name="commodity_id" required>
+                {% for c in commodities %}
+                    <option value="{{ c.id }}">{{ c.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label>Quantity Used</label>
+            <input type="number" class="form-control" name="quantity_used" required>
+        </div>
+        <div class="mb-3">
+            <label>Quantity Received</label>
+            <input type="number" class="form-control" name="quantity_received" required>
+        </div>
+        <div class="mb-3">
+            <label>Balance</label>
+            <input type="number" class="form-control" name="balance" required>
+        </div>
+        <div class="mb-3">
+            <label>Expiry Date</label>
+            <input type="date" class="form-control" name="expiry_date" required>
+        </div>
+        <button type="submit" class="btn btn-success">Submit Report</button>
+    </form>
+</div>
 {% endblock %}
