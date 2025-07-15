@@ -1,38 +1,26 @@
 {% extends 'base.html' %}
-
 {% block content %}
-<div class="container">
-    <h2>My Reports</h2>
-    <a class="btn btn-primary mb-3" href="{{ url_for('submit_report') }}">Submit New Report</a>
-    {% if reports %}
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th>Facility</th>
-                    <th>Commodity</th>
-                    <th>Used</th>
-                    <th>Received</th>
-                    <th>Balance</th>
-                    <th>Expiry Date</th>
-                    <th>Date Submitted</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for r in reports %}
-                    <tr>
-                        <td>{{ r.facility.name }}</td>
-                        <td>{{ r.commodity.name }}</td>
-                        <td>{{ r.quantity_used }}</td>
-                        <td>{{ r.quantity_received }}</td>
-                        <td>{{ r.balance }}</td>
-                        <td>{{ r.expiry_date }}</td>
-                        <td>{{ r.date_submitted.strftime('%Y-%m-%d') }}</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    {% else %}
-        <p>No reports submitted yet.</p>
-    {% endif %}
-</div>
+<h2>My Reports</h2>
+<table border="1">
+    <tr>
+        <th>Facility</th>
+        <th>Commodity</th>
+        <th>Used</th>
+        <th>Received</th>
+        <th>Balance</th>
+        <th>Expiry Date</th>
+        <th>Date Submitted</th>
+    </tr>
+    {% for report in reports %}
+    <tr>
+        <td>{{ report.facility.name }}</td>
+        <td>{{ report.commodity.name }}</td>
+        <td>{{ report.quantity_used }}</td>
+        <td>{{ report.quantity_received }}</td>
+        <td>{{ report.balance }}</td>
+        <td>{{ report.expiry_date }}</td>
+        <td>{{ report.date_submitted.strftime("%Y-%m-%d") }}</td>
+    </tr>
+    {% endfor %}
+</table>
 {% endblock %}
