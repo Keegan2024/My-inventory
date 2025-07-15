@@ -1,4 +1,5 @@
 import os
+import logging
 from flask import Flask, render_template, redirect, url_for, request, flash, session, make_response
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -6,13 +7,16 @@ from datetime import datetime
 import pandas as pd
 import io
 
+# Initialize logging
+logging.basicConfig(level=logging.DEBUG)
+
 app = Flask(__name__)
 
 # Configuration for Railway
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///inventory.db').replace('postgres://', 'postgresql://')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['PREFERRED_URL_SCHEME'] = 'https'  # Important for Railway
+app.config['PREFERRED_URL_SCHEME'] = 'https'
 
 db = SQLAlchemy(app)
 
@@ -47,6 +51,25 @@ class Report(db.Model):
     balance = db.Column(db.Integer, nullable=False)
     date_submitted = db.Column(db.DateTime, default=datetime.utcnow)
 
+# Initialize database
+with app.app_context():
+    db.create_all()
+    try:
+        db.session.execute("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"")
+        db.session.commit()
+    except Exception as e:
+        logging.warning(f"Could not create extension: {e}")
+    
+    if not User.query.filter_by(username='admin').first():
+        admin = User(
+            username='admin',
+            password=generate_password_hash(os.environ.get('ADMIN_PASSWORD', 'admin123')),
+            role='admin',
+            approved=True
+        )
+        db.session.add(admin)
+        db.session.commit()
+
 # Routes
 @app.route('/')
 def home():
@@ -77,21 +100,6 @@ def logout():
     session.pop('user_id', None)
     return redirect(url_for('login'))
 
-# Initialize database
-@app.before_first_request
-def initialize_database():
-    db.create_all()
-    if not User.query.filter_by(username='admin').first():
-        admin = User(
-            username='admin',
-            password=generate_password_hash(os.environ.get('ADMIN_PASSWORD', 'admin123')),
-            role='admin',
-            approved=True
-        )
-        db.session.add(admin)
-        db.session.commit()
-
-# Railway requires this to be 0.0.0.0 and PORT from environment
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
