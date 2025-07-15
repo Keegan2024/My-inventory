@@ -207,6 +207,14 @@ def delete_facility(facility_id):
     db.session.commit()
     flash('Facility deleted successfully.', 'success')
     return redirect(url_for('facilities'))
+@app.route('/submit_report')
+def submit_report():
+    username = session.get('username')
+    if not username:
+        flash('Please log in.', 'warning')
+        return redirect(url_for('login'))
+    user = User.query.filter_by(username=username).first()
+    return render_template('submit_report.html', user=user)
 
 @app.route('/logout')
 def logout():
