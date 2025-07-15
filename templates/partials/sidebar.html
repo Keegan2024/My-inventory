@@ -1,0 +1,34 @@
+<div id="layoutSidenav_nav">
+    <nav class="sb-sidenav accordion sb-sidenav-dark" id="sidenavAccordion">
+        <div class="sb-sidenav-menu">
+            <div class="nav">
+                <a class="nav-link" href="{{ url_for('dashboard') }}">
+                    <div class="sb-nav-link-icon"><i class="fas fa-tachometer-alt"></i></div>
+                    Dashboard
+                </a>
+                <a class="nav-link" href="{{ url_for('commodities') }}">
+                    <div class="sb-nav-link-icon"><i class="fas fa-box"></i></div>
+                    Commodities
+                </a>
+                <a class="nav-link" href="{{ url_for('submit_report') }}">
+                    <div class="sb-nav-link-icon"><i class="fas fa-file-alt"></i></div>
+                    Submit Report
+                </a>
+                <a class="nav-link" href="{{ url_for('reports') }}">
+                    <div class="sb-nav-link-icon"><i class="fas fa-chart-bar"></i></div>
+                    Reports
+                </a>
+                {% if user and user.role == 'master_admin' %}
+                <a class="nav-link" href="{{ url_for('users') }}">
+                    <div class="sb-nav-link-icon"><i class="fas fa-users"></i></div>
+                    Users
+                </a>
+                {% endif %}
+                <a class="nav-link" href="{{ url_for('help_page') }}">
+                    <div class="sb-nav-link-icon"><i class="fas fa-question-circle"></i></div>
+                    Help
+                </a>
+            </div>
+        </div>
+    </nav>
+</div>
