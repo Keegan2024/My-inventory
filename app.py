@@ -115,11 +115,11 @@ def submit_report():
     user = User.query.filter_by(username=username).first()
     commodities = Commodity.query.all()
     if request.method == 'POST':
-        commodity_id = request.form['commodity_id']
-        quantity_used = int(request.form['quantity_used'])
-        quantity_received = int(request.form['quantity_received'])
-        balance = int(request.form['balance'])
-        expiry_date = request.form['expiry_date']
+        commodity_id = request.form.get('commodity_id')
+        quantity_used = int(request.form.get('quantity_used'))
+        quantity_received = int(request.form.get('quantity_received'))
+        balance = int(request.form.get('balance'))
+        expiry_date = request.form.get('expiry_date')
 
         report = Report(
             user_id=user.id,
@@ -149,6 +149,19 @@ def reports():
         all_reports = Report.query.filter_by(facility_id=user.facility_id).all()
     return render_template('reports.html', reports=all_reports, user=user)
 
+@app.route('/facilities')
+def facilities():
+    username = session.get('username')
+    if not username:
+        flash('Please login first.', 'warning')
+        return redirect(url_for('login'))
+    user = User.query.filter_by(username=username).first()
+    if user.role != 'master_admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('dashboard'))
+    all_facilities = Facility.query.all()
+    return render_template('facilities.html', facilities=all_facilities, user=user)
+
 @app.route('/users')
 def users():
     username = session.get('username')
@@ -172,7 +185,6 @@ def help_page():
 
 with app.app_context():
     db.create_all()
-
     # Create or update master admin user
     master_admin = User.query.filter_by(username='Keegan').first()
     if master_admin:
