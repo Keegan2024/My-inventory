@@ -1,18 +1,28 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Reports</title>
-</head>
-<body>
-    <h2>Reports</h2>
-    <a href="{{ url_for('export_reports') }}">Export to Excel (CSV)</a>
-    <ul>
-        {% for r in reports %}
-            <li>
-                Facility ID: {{ r.facility_id }} — Commodity ID: {{ r.commodity_id }} — Period: {{ r.period }} — Used: {{ r.quantity_used }} — Status: {{ r.status }} — Feedback: {{ r.feedback }}
-            </li>
+{% extends 'base.html' %}
+{% block content %}
+<h1>Reports</h1>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Commodity</th>
+            <th>Used</th>
+            <th>Received</th>
+            <th>Balance</th>
+            <th>Expiry Date</th>
+            <th>Date Submitted</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for report in reports %}
+        <tr>
+            <td>{{ report.commodity_id }}</td>
+            <td>{{ report.quantity_used }}</td>
+            <td>{{ report.quantity_received }}</td>
+            <td>{{ report.balance }}</td>
+            <td>{{ report.expiry_date }}</td>
+            <td>{{ report.date_submitted.strftime('%Y-%m-%d') }}</td>
+        </tr>
         {% endfor %}
-    </ul>
-    <a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
-</body>
-</html>
+    </tbody>
+</table>
+{% endblock %}
