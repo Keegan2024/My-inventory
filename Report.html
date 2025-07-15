@@ -1,18 +1,38 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container mt-5">
-    <h1>Reports</h1>
-    <p>Welcome, {{ user.username }}. This is the reports page.</p>
-    
+<div class="container">
+    <h2>My Reports</h2>
+    <a class="btn btn-primary mb-3" href="{{ url_for('submit_report') }}">Submit New Report</a>
     {% if reports %}
-      <ul>
-      {% for report in reports %}
-        <li>{{ report }}</li>
-      {% endfor %}
-      </ul>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Facility</th>
+                    <th>Commodity</th>
+                    <th>Used</th>
+                    <th>Received</th>
+                    <th>Balance</th>
+                    <th>Expiry Date</th>
+                    <th>Date Submitted</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in reports %}
+                    <tr>
+                        <td>{{ r.facility.name }}</td>
+                        <td>{{ r.commodity.name }}</td>
+                        <td>{{ r.quantity_used }}</td>
+                        <td>{{ r.quantity_received }}</td>
+                        <td>{{ r.balance }}</td>
+                        <td>{{ r.expiry_date }}</td>
+                        <td>{{ r.date_submitted.strftime('%Y-%m-%d') }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     {% else %}
-      <p>No reports to show.</p>
+        <p>No reports submitted yet.</p>
     {% endif %}
 </div>
 {% endblock %}
