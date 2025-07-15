@@ -10,6 +10,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventory.db'
 db = SQLAlchemy(app)
 
 from flask import make_response
+import pandas as pd
 import io
 
 @app.route('/download_reports')
@@ -21,12 +22,16 @@ def download_reports():
 
     reports = Report.query.all()
 
-    # Prepare data
+    if not reports:
+        flash('No reports to download.', 'warning')
+        return redirect(url_for('reports'))
+
+    # Build data list
     data = []
     for r in reports:
         data.append({
-            'Facility': r.facility.name,
-            'Commodity': r.commodity.name,
+            'Facility': r.facility.name if r.facility else '',
+            'Commodity': r.commodity.name if r.commodity else '',
             'Quantity Used': r.quantity_used,
             'Quantity Received': r.quantity_received,
             'Balance': r.balance,
@@ -34,16 +39,24 @@ def download_reports():
             'Submitted On': r.date_submitted.strftime('%Y-%m-%d'),
         })
     
+    # Convert to DataFrame
     df = pd.DataFrame(data)
 
+    # Create a BytesIO object
     output = io.BytesIO()
+
+    # Write Excel using xlsxwriter
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df.to_excel(writer, index=False, sheet_name='Reports')
 
+    # Go back to start of the stream
     output.seek(0)
+
+    # Prepare response
     response = make_response(output.read())
     response.headers["Content-Disposition"] = "attachment; filename=reports.xlsx"
     response.headers["Content-type"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
     return response
 # ---------------------------
 # Database models
