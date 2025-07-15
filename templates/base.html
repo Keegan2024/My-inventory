@@ -1,34 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="utf-8" />
-    <title>{% block title %}Dashboard{% endblock %}</title>
-    <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet" />
+    <meta charset="UTF-8">
+    <title>Inventory System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    {% block head %}{% endblock %}
 </head>
-
-<body class="sb-nav-fixed">
-    {% include 'partials/navbar.html' %}
-
-    <div id="layoutSidenav">
-        {% include 'partials/sidebar.html' %}
-        <div id="layoutSidenav_content">
-            <main>
-                <div class="container-fluid px-4">
-                    {% block content %}{% endblock %}
-                </div>
-            </main>
-            <footer class="py-4 bg-light mt-auto">
-                <div class="container-fluid text-center">
-                    <div class="small">Call or WhatsApp: 0972511451</div>
-                </div>
-            </footer>
+<body style="background-color: #f8f9fa;">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('dashboard') }}">Inventory</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('commodities') }}">Commodities</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('submit_report') }}">Submit Report</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('reports') }}">Reports</a></li>
+                    {% if user and user.role == 'master_admin' %}
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('facilities') }}">Facilities</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('users') }}">Users</a></li>
+                    {% endif %}
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('help_page') }}">Help</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}">Logout</a></li>
+                </ul>
+            </div>
         </div>
+    </nav>
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
     </div>
-
-    <script src="{{ url_for('static', filename='js/scripts.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
-
 </html>
