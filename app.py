@@ -64,6 +64,20 @@ def signup():
         return redirect(url_for('login'))
     return render_template('signup.html')
 
+@app.route('/commodities')
+def commodities():
+    username = session.get('username')
+    if not username:
+        flash('Please log in.', 'warning')
+        return redirect(url_for('login'))
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        flash('User not found.', 'danger')
+        return redirect(url_for('login'))
+
+    all_commodities = Commodity.query.all()
+    return render_template('commodities.html', user=user, commodities=all_commodities)
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
