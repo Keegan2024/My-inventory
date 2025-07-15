@@ -1,16 +1,3 @@
-{% extends "base.html" %}
-
-{% block content %}
-<h1>Welcome, {{ user.username }}</h1>
-
-<h2>Facilities</h2>
-<ul>
-  {% for f in facilities %}
-    <li>{{ f.name }}</li>
-  {% endfor %}
-</ul>
-{% endblock %}
-
 {% extends 'base.html' %}
 
 {% block content %}
@@ -23,11 +10,20 @@
 
             <div class="d-grid gap-2">
                 <a href="{{ url_for('users') }}" class="btn btn-primary btn-lg">Manage Users</a>
-                <a href="{{ url_for('facilities') }}" class="btn btn-success btn-lg">Manage Facilities</a>
                 <a href="{{ url_for('commodities') }}" class="btn btn-info btn-lg">Manage Commodities</a>
-                <a href="{{ url_for('reports') }}" class="btn btn-warning btn-lg">View Reports</a>
                 <a href="{{ url_for('logout') }}" class="btn btn-danger btn-lg">Logout</a>
             </div>
+
+            <hr class="my-4">
+
+            <h4>Facilities</h4>
+            <ul class="list-group">
+              {% for f in facilities %}
+                <li class="list-group-item">{{ f.name }}</li>
+              {% else %}
+                <li class="list-group-item">No facilities available.</li>
+              {% endfor %}
+            </ul>
         </div>
     </div>
 </div>
