@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, request, flash, session
+from flask import Flask, render_template, redirect, url_for, request, flash, session, abort
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
@@ -8,51 +8,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventory.db'
 db = SQLAlchemy(app)
-from flask import abort  # add this import at top
 
-# Edit facility
-@app.route('/facilities/edit/<int:facility_id>', methods=['GET', 'POST'])
-def edit_facility(facility_id):
-    username = session.get('username')
-    if not username:
-        flash('Please log in.', 'warning')
-        return redirect(url_for('login'))
-    user = User.query.filter_by(username=username).first()
-    if user.role not in ['admin', 'master_admin']:
-        flash('Unauthorized access.', 'danger')
-        return redirect(url_for('dashboard'))
-
-    facility = Facility.query.get_or_404(facility_id)
-
-    if request.method == 'POST':
-        facility.name = request.form['name']
-        facility.province = request.form['province']
-        facility.district = request.form['district']
-        facility.hub = request.form.get('hub') or None
-
-        db.session.commit()
-        flash('Facility updated successfully.', 'success')
-        return redirect(url_for('facilities'))
-
-    return render_template('edit_facility.html', user=user, facility=facility)
-
-# Delete facility
-@app.route('/facilities/delete/<int:facility_id>', methods=['POST'])
-def delete_facility(facility_id):
-    username = session.get('username')
-    if not username:
-        flash('Please log in.', 'warning')
-        return redirect(url_for('login'))
-    user = User.query.filter_by(username=username).first()
-    if user.role not in ['admin', 'master_admin']:
-        flash('Unauthorized access.', 'danger')
-        return redirect(url_for('dashboard'))
-
-    facility = Facility.query.get_or_404(facility_id)
-    db.session.delete(facility)
-    db.session.commit()
-    flash('Facility deleted successfully.', 'success')
-    return redirect(url_for('facilities'))
 # ---------------------------
 # Database models
 # ---------------------------
@@ -70,6 +26,7 @@ class Commodity(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.String(200), nullable=True)
+    category = db.Column(db.String(100), nullable=True)  # Added category column for grouping
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -110,32 +67,6 @@ def signup():
         flash('Signup successful. Please wait for admin approval.', 'success')
         return redirect(url_for('login'))
     return render_template('signup.html')
-
-@app.route('/submit_report')
-def submit_report():
-    username = session.get('username')
-    if not username:
-        flash('Please log in.', 'warning')
-        return redirect(url_for('login'))
-    user = User.query.filter_by(username=username).first()
-    return render_template('submit_report.html', user=user)
-
-@app.route('/reports')
-def reports():
-    username = session.get('username')
-    if not username:
-        flash('Please log in.', 'warning')
-        return redirect(url_for('login'))
-    user = User.query.filter_by(username=username).first()
-    return render_template('reports.html', user=user)
-
-@app.route('/help')
-def help_page():
-    username = session.get('username')
-    if not username:
-        flash('Please log in.', 'warning')
-        return redirect(url_for('login'))
-    return render_template('help.html', user=user)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -236,6 +167,47 @@ def facilities():
 
     return render_template('facilities.html', user=user, facilities=all_facilities)
 
+@app.route('/facilities/edit/<int:facility_id>', methods=['GET', 'POST'])
+def edit_facility(facility_id):
+    username = session.get('username')
+    if not username:
+        flash('Please log in.', 'warning')
+        return redirect(url_for('login'))
+    user = User.query.filter_by(username=username).first()
+    if user.role not in ['admin', 'master_admin']:
+        flash('Unauthorized access.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    facility = Facility.query.get_or_404(facility_id)
+
+    if request.method == 'POST':
+        facility.name = request.form['name']
+        facility.province = request.form['province']
+        facility.district = request.form['district']
+        facility.hub = request.form.get('hub') or None
+        db.session.commit()
+        flash('Facility updated successfully.', 'success')
+        return redirect(url_for('facilities'))
+
+    return render_template('edit_facility.html', user=user, facility=facility)
+
+@app.route('/facilities/delete/<int:facility_id>', methods=['POST'])
+def delete_facility(facility_id):
+    username = session.get('username')
+    if not username:
+        flash('Please log in.', 'warning')
+        return redirect(url_for('login'))
+    user = User.query.filter_by(username=username).first()
+    if user.role not in ['admin', 'master_admin']:
+        flash('Unauthorized access.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    facility = Facility.query.get_or_404(facility_id)
+    db.session.delete(facility)
+    db.session.commit()
+    flash('Facility deleted successfully.', 'success')
+    return redirect(url_for('facilities'))
+
 @app.route('/logout')
 def logout():
     session.pop('username', None)
@@ -249,10 +221,9 @@ def logout():
 with app.app_context():
     db.create_all()
 
-    # Load facilities from CSV if not already present
+    # Load facilities
     if Facility.query.count() == 0:
         df = pd.read_csv('zambia_facilities.csv')
-
         for _, row in df.iterrows():
             f = Facility(
                 country=row['Country'],
@@ -262,11 +233,25 @@ with app.app_context():
                 name=row['FacilityName']
             )
             db.session.add(f)
-
         db.session.commit()
         print("✅ Facilities loaded successfully!")
     else:
         print("✅ Facilities already exist, skipping import.")
+
+    # Load commodities
+    if Commodity.query.count() == 0:
+        df_c = pd.read_csv('commodities.csv')
+        for _, row in df_c.iterrows():
+            c = Commodity(
+                name=row['Name'],
+                description=row['Description'],
+                category=row['Category']
+            )
+            db.session.add(c)
+        db.session.commit()
+        print("✅ Commodities loaded successfully!")
+    else:
+        print("✅ Commodities already exist, skipping import.")
 
     # Create or update master admin user
     admin_user = User.query.filter_by(username='Keegan').first()
