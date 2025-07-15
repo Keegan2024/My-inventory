@@ -3,6 +3,58 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 
+def preload_zambian_facilities():
+    # Example data (expand this as needed!)
+    facilities_data = [
+        {
+            "country": "Zambia",
+            "province": "Luapula",
+            "district": "Nchelenge",
+            "hub": "Nchelenge Hub",
+            "name": "St. Paul’s Mission Hospital"
+        },
+        {
+            "country": "Zambia",
+            "province": "Luapula",
+            "district": "Kawambwa",
+            "hub": "Kawambwa Hub",
+            "name": "Kawambwa District Hospital"
+        },
+        {
+            "country": "Zambia",
+            "province": "Lusaka",
+            "district": "Lusaka",
+            "hub": "Lusaka Urban Hub",
+            "name": "University Teaching Hospital"
+        },
+        {
+            "country": "Zambia",
+            "province": "Copperbelt",
+            "district": "Ndola",
+            "hub": "Ndola Hub",
+            "name": "Ndola Central Hospital"
+        },
+        {
+            "country": "Zambia",
+            "province": "Southern",
+            "district": "Choma",
+            "hub": "Choma Hub",
+            "name": "Choma General Hospital"
+        },
+        # ➕ You can add many more here
+    ]
+
+    for f in facilities_data:
+        existing = Facility.query.filter_by(name=f["name"]).first()
+        if not existing:
+            new_facility = Facility(
+                name=f["name"]
+                # You can extend your Facility model to include country, province, district, hub columns if you want
+            )
+            db.session.add(new_facility)
+    db.session.commit()
+    print("✅ Preloaded sample Zambian facilities!")
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventory.db'
@@ -14,8 +66,15 @@ db = SQLAlchemy(app)
 
 class Facility(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    country = db.Column(db.String(100), nullable=False, default="Zambia")
+    province = db.Column(db.String(100), nullable=False)
+    district = db.Column(db.String(100), nullable=False)
+    hub = db.Column(db.String(100), nullable=True)
     name = db.Column(db.String(100), nullable=False)
     users = db.relationship('User', backref='facility', lazy=True)
+    with app.app_context():
+    db.create_all()
+    preload_zambian_facilities()
 
 class Commodity(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -191,6 +250,27 @@ def logout():
 
 with app.app_context():
     db.create_all()
+import pandas as pd
+
+# Check if facilities already exist (to avoid duplicates)
+if Facility.query.count() == 0:
+    # Load CSV
+    df = pd.read_csv('zambia_facilities.csv')
+
+    for _, row in df.iterrows():
+        f = Facility(
+            country=row['Country'],
+            province=row['Province'],
+            hub=row['Hub'] if not pd.isna(row['Hub']) else None,
+            district=row['District'],
+            name=row['FacilityName']
+        )
+        db.session.add(f)
+    
+    db.session.commit()
+    print("✅ Facilities loaded successfully!")
+else:
+    print("✅ Facilities already exist, skipping import.")
 
     # Create or update master admin user
     admin_user = User.query.filter_by(username='Keegan').first()
