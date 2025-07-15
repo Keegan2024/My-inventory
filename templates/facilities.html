@@ -2,20 +2,55 @@
 {% block content %}
 <h2>Facilities</h2>
 
-<form method="POST" class="mb-4">
+<table class="table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Province</th>
+            <th>District</th>
+            <th>Hub</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for f in facilities %}
+        <tr>
+            <td>{{ f.name }}</td>
+            <td>{{ f.province }}</td>
+            <td>{{ f.district }}</td>
+            <td>{{ f.hub or "" }}</td>
+            <td>
+                <a href="{{ url_for('edit_facility', facility_id=f.id) }}" class="btn btn-sm btn-primary">Edit</a>
+
+                <form action="{{ url_for('delete_facility', facility_id=f.id) }}" method="post" style="display:inline-block;" onsubmit="return confirm('Delete this facility?');">
+                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                </form>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<hr>
+
+<h3>Add New Facility</h3>
+<form method="post" action="{{ url_for('facilities') }}">
     <div class="mb-3">
         <label for="name" class="form-label">Facility Name</label>
-        <input type="text" class="form-control" id="name" name="name" required>
+        <input type="text" name="name" id="name" class="form-control" required>
+    </div>
+    <div class="mb-3">
+        <label for="province" class="form-label">Province</label>
+        <input type="text" name="province" id="province" class="form-control" required>
+    </div>
+    <div class="mb-3">
+        <label for="district" class="form-label">District</label>
+        <input type="text" name="district" id="district" class="form-control" required>
+    </div>
+    <div class="mb-3">
+        <label for="hub" class="form-label">Hub (optional)</label>
+        <input type="text" name="hub" id="hub" class="form-control">
     </div>
     <button type="submit" class="btn btn-success">Add Facility</button>
 </form>
-
-<ul class="list-group">
-    {% for facility in facilities %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-            {{ facility.name }}
-            <a href="{{ url_for('delete_facility', facility_id=facility.id) }}" class="btn btn-danger btn-sm">Delete</a>
-        </li>
-    {% endfor %}
-</ul>
 {% endblock %}
