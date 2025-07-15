@@ -2,31 +2,39 @@
 
 {% block content %}
 <div class="content">
-    <h2>Submit Weekly Supply Chain Report</h2>
+    <h2>Submit Supply Chain Report</h2>
     
-    <form method="POST">
+    <form method="POST" id="reportForm">
         <div class="form-section">
-            <h3>Report Details</h3>
             <div class="form-group">
-                <label>Week Number</label>
-                <input type="number" name="week_number" min="1" max="52" required>
+                <label>Facility</label>
+                <input type="text" value="{{ user.facility.name }}" readonly class="form-control">
             </div>
             <div class="form-group">
-                <label>Report Date</label>
-                <input type="date" name="report_date" required>
+                <label>Report Date*</label>
+                <input type="date" name="report_date" required class="form-control" 
+                       value="{{ form_data.report_date if form_data.report_date else '' }}">
+            </div>
+            <div class="form-group">
+                <label>Reporting Period*</label>
+                <select name="report_period" required class="form-control">
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                </select>
             </div>
         </div>
 
         <div class="form-section">
             <h3>Commodity Tracking</h3>
-            <table class="table">
+            <table class="table" id="commodityTable">
                 <thead>
                     <tr>
                         <th>Commodity</th>
                         <th>Opening Balance</th>
-                        <th>Total Received</th>
-                        <th>Total Dispensed</th>
-                        <th>Stock on Hand</th>
+                        <th>Received</th>
+                        <th>Used</th>
+                        <th>Closing Balance</th>
                         <th>Expiry Date</th>
                         <th>Remarks</th>
                     </tr>
@@ -35,55 +43,65 @@
                     {% for commodity in commodities %}
                     <tr>
                         <td>{{ commodity.name }}</td>
-                        <td><input type="number" name="opening_balance_{{ commodity.id }}" min="0" value="0"></td>
-                        <td><input type="number" name="total_received_{{ commodity.id }}" min="0" value="0"></td>
-                        <td><input type="number" name="total_dispensed_{{ commodity.id }}" min="0" value="0"></td>
-                        <td><input type="number" name="stock_on_hand_{{ commodity.id }}" min="0" value="0"></td>
-                        <td><input type="text" name="exp_date_{{ commodity.id }}" placeholder="DD/MM/YYYY"></td>
-                        <td><input type="text" name="remarks_{{ commodity.id }}"></td>
+                        <td>
+                            <input type="number" name="opening_balance_{{ commodity.id }}" 
+                                   value="{{ form_data['opening_balance_' ~ commodity.id] if 'opening_balance_' ~ commodity.id in form_data else '' }}" 
+                                   min="0" class="form-control opening-balance" required>
+                        </td>
+                        <td>
+                            <input type="number" name="received_{{ commodity.id }}" 
+                                   value="{{ form_data['received_' ~ commodity.id] if 'received_' ~ commodity.id in form_data else '0' }}" 
+                                   min="0" class="form-control received" required>
+                        </td>
+                        <td>
+                            <input type="number" name="used_{{ commodity.id }}" 
+                                   value="{{ form_data['used_' ~ commodity.id] if 'used_' ~ commodity.id in form_data else '0' }}" 
+                                   min="0" class="form-control used" required>
+                        </td>
+                        <td>
+                            <input type="number" name="closing_balance_{{ commodity.id }}" 
+                                   value="{{ form_data['closing_balance_' ~ commodity.id] if 'closing_balance_' ~ commodity.id in form_data else '' }}" 
+                                   min="0" class="form-control closing-balance" readonly required>
+                        </td>
+                        <td>
+                            <input type="text" name="exp_date_{{ commodity.id }}" 
+                                   value="{{ form_data['exp_date_' ~ commodity.id] if 'exp_date_' ~ commodity.id in form_data else '' }}" 
+                                   placeholder="DD/MM/YYYY" class="form-control">
+                        </td>
+                        <td>
+                            <input type="text" name="remarks_{{ commodity.id }}" 
+                                   value="{{ form_data['remarks_' ~ commodity.id] if 'remarks_' ~ commodity.id in form_data else '' }}" 
+                                   class="form-control">
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
 
-        <div class="form-section">
-            <h3>Additional Information</h3>
-            <div class="form-group">
-                <label>Clients Seen</label>
-                <input type="number" name="clients_seen" min="0" value="0">
-            </div>
-            <div class="form-group">
-                <label>Total Screened</label>
-                <input type="number" name="screened" min="0" value="0">
-            </div>
-            <div class="form-group">
-                <label>Eligible for HEPS</label>
-                <input type="number" name="eligible_for_heps" min="0" value="0">
-            </div>
-            <div class="form-group">
-                <label>HEPS Given to Clients</label>
-                <input type="number" name="heps_given" min="0" value="0">
-            </div>
-            <div class="form-group">
-                <label>Total Refill</label>
-                <input type="number" name="total_refill" min="0" value="0">
-            </div>
-            <div class="form-group">
-                <label>HEPS Stock on Hand</label>
-                <input type="number" name="heps_stock" min="0" value="0">
-            </div>
-            <div class="form-group">
-                <label>TPT Initiations</label>
-                <input type="number" name="tpt_initiations" min="0" value="0">
-            </div>
-            <div class="form-group">
-                <label>VL Collected</label>
-                <input type="number" name="vl_collected" min="0" value="0">
-            </div>
-        </div>
-
         <button type="submit" class="btn-submit">Submit Report</button>
     </form>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('reportForm');
+    
+    // Calculate closing balance when any of the values change
+    form.addEventListener('input', function(e) {
+        if (e.target.classList.contains('opening-balance') || 
+            e.target.classList.contains('received') || 
+            e.target.classList.contains('used')) {
+            
+            const row = e.target.closest('tr');
+            const opening = parseInt(row.querySelector('.opening-balance').value) || 0;
+            const received = parseInt(row.querySelector('.received').value) || 0;
+            const used = parseInt(row.querySelector('.used').value) || 0;
+            
+            const closing = opening + received - used;
+            row.querySelector('.closing-balance').value = closing >= 0 ? closing : 0;
+        }
+    });
+});
+</script>
 {% endblock %}
