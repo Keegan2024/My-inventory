@@ -9,6 +9,42 @@ app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventory.db'
 db = SQLAlchemy(app)
 
+from flask import make_response
+import io
+
+@app.route('/download_reports')
+def download_reports():
+    username = session.get('username')
+    if not username:
+        flash('Please log in.', 'warning')
+        return redirect(url_for('login'))
+
+    reports = Report.query.all()
+
+    # Prepare data
+    data = []
+    for r in reports:
+        data.append({
+            'Facility': r.facility.name,
+            'Commodity': r.commodity.name,
+            'Quantity Used': r.quantity_used,
+            'Quantity Received': r.quantity_received,
+            'Balance': r.balance,
+            'Expiry Date': r.expiry_date,
+            'Submitted On': r.date_submitted.strftime('%Y-%m-%d'),
+        })
+    
+    df = pd.DataFrame(data)
+
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='Reports')
+
+    output.seek(0)
+    response = make_response(output.read())
+    response.headers["Content-Disposition"] = "attachment; filename=reports.xlsx"
+    response.headers["Content-type"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    return response
 # ---------------------------
 # Database models
 # ---------------------------
@@ -108,9 +144,28 @@ def reports():
         flash('Please log in.', 'warning')
         return redirect(url_for('login'))
     user = User.query.filter_by(username=username).first()
-    user_reports = Report.query.filter_by(user_id=user.id).all()
 
-    # You can also join and show facility and commodity names if needed
+    # Base query
+    user_reports = Report.query
+
+    # Filters
+    facility_name = request.args.get('facility')
+    commodity_name = request.args.get('commodity')
+    date_str = request.args.get('date')
+
+    if facility_name:
+        user_reports = user_reports.join(Facility).filter(Facility.name.ilike(f"%{facility_name}%"))
+    if commodity_name:
+        user_reports = user_reports.join(Commodity).filter(Commodity.name.ilike(f"%{commodity_name}%"))
+    if date_str:
+        try:
+            date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+            user_reports = user_reports.filter(db.func.date(Report.date_submitted) == date_obj.date())
+        except:
+            flash('Invalid date format', 'danger')
+
+    user_reports = user_reports.all()
+
     return render_template('reports.html', user=user, reports=user_reports)
 
 # ---------------------------
