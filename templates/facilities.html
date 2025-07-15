@@ -18,3 +18,17 @@
     </tbody>
 </table>
 {% endblock %}
+
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <h2>Facilities</h2>
+    <ul class="list-group">
+        {% for facility in facilities %}
+        <li class="list-group-item">{{ facility.name }}</li>
+        {% else %}
+        <li class="list-group-item">No facilities found.</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}
