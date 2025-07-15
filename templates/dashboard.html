@@ -1,3 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Welcome, {{ user.username }}</h1>
+
+<h2>Facilities</h2>
+<ul>
+  {% for f in facilities %}
+    <li>{{ f.name }}</li>
+  {% endfor %}
+</ul>
+{% endblock %}
+
 {% extends 'base.html' %}
 
 {% block content %}
