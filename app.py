@@ -192,35 +192,39 @@ def submit_report():
         flash('Please log in.', 'warning')
         return redirect(url_for('login'))
     user = User.query.filter_by(username=username).first()
+    facility = Facility.query.first()  # Adjust logic if user can select
 
-    # Get all facilities and commodities to fill dropdowns
-    facilities = Facility.query.all()
     commodities = Commodity.query.all()
 
-    if request.method == 'POST':
-        facility_id = request.form.get('facility_id')
-        commodity_id = request.form.get('commodity_id')
-        quantity_used = int(request.form.get('quantity_used', 0))
-        quantity_received = int(request.form.get('quantity_received', 0))
-        balance = int(request.form.get('balance', 0))
-        expiry_date = request.form.get('expiry_date')
+    # Prepare opening balances
+    for commodity in commodities:
+        last_report = Report.query.filter_by(facility_id=facility.id, commodity_id=commodity.id).order_by(Report.date_submitted.desc()).first()
+        commodity.opening_balance = last_report.balance if last_report else 0
 
-        # Create and save the report
-        report = Report(
-            user_id=user.id,
-            facility_id=facility_id,
-            commodity_id=commodity_id,
-            quantity_used=quantity_used,
-            quantity_received=quantity_received,
-            balance=balance,
-            expiry_date=expiry_date
-        )
-        db.session.add(report)
+    if request.method == 'POST':
+        for commodity in commodities:
+            opening_balance = int(request.form.get(f'opening_balance_{commodity.id}', 0))
+            quantity_received = int(request.form.get(f'quantity_received_{commodity.id}', 0))
+            quantity_used = int(request.form.get(f'quantity_used_{commodity.id}', 0))
+            balance = opening_balance + quantity_received - quantity_used
+            expiry_date = request.form.get(f'expiry_date_{commodity.id}', '')
+
+            report = Report(
+                user_id=user.id,
+                facility_id=facility.id,
+                commodity_id=commodity.id,
+                quantity_received=quantity_received,
+                quantity_used=quantity_used,
+                balance=balance,
+                expiry_date=expiry_date
+            )
+            db.session.add(report)
+
         db.session.commit()
         flash('Report submitted successfully.', 'success')
-        return redirect(url_for('reports'))
+        return redirect(url_for('dashboard'))
 
-    return render_template('submit_report.html', user=user, facilities=facilities, commodities=commodities)
+    return render_template('submit_report.html', user=user, facility=facility, commodities=commodities)
 
 @app.route('/users')
 def users():
