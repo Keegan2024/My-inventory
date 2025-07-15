@@ -1,14 +1,23 @@
-<h2>Facilities</h2>
-<ul>
-    {% for facility in facilities %}
-        <li>{{ facility.name }}</li>
-    {% endfor %}
-</ul>
+{% extends 'base.html' %}
 
-<h3>Add New Facility</h3>
-<form method="POST">
-    Name: <input type="text" name="name">
-    <button type="submit">Add</button>
-</form>
+{% block content %}
+<h1>Facilities</h1>
 
-<a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+<table class="table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Name</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for facility in facilities %}
+        <tr>
+            <td>{{ facility.id }}</td>
+            <td>{{ facility.name }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}
