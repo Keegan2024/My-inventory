@@ -1,34 +1,80 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h2>Submitted Reports</h2>
+<div class="container mt-4">
+    <h2 class="mb-4">Submitted Reports</h2>
 
-{% if reports %}
-<table border="1" cellpadding="5" cellspacing="0">
-    <tr>
-        <th>ID</th>
-        <th>Facility</th>
-        <th>Commodity</th>
-        <th>Quantity Used</th>
-        <th>Quantity Received</th>
-        <th>Balance</th>
-        <th>Expiry Date</th>
-        <th>Date Submitted</th>
-    </tr>
-    {% for report in reports %}
-    <tr>
-        <td>{{ report.id }}</td>
-        <td>{{ report.facility.name }}</td>
-        <td>{{ report.commodity.name }}</td>
-        <td>{{ report.quantity_used }}</td>
-        <td>{{ report.quantity_received }}</td>
-        <td>{{ report.balance }}</td>
-        <td>{{ report.expiry_date }}</td>
-        <td>{{ report.date_submitted.strftime('%Y-%m-%d') }}</td>
-    </tr>
-    {% endfor %}
-</table>
-{% else %}
-<p>No reports submitted yet.</p>
-{% endif %}
+    <!-- Filter section -->
+    <form method="get" class="row g-3 mb-4">
+        <div class="col-md-3">
+            <input type="text" class="form-control" name="facility" placeholder="Filter by Facility" value="{{ request.args.get('facility', '') }}">
+        </div>
+        <div class="col-md-3">
+            <input type="text" class="form-control" name="commodity" placeholder="Filter by Commodity" value="{{ request.args.get('commodity', '') }}">
+        </div>
+        <div class="col-md-3">
+            <input type="date" class="form-control" name="date" value="{{ request.args.get('date', '') }}">
+        </div>
+        <div class="col-md-3 d-grid">
+            <button type="submit" class="btn btn-primary">Apply Filter</button>
+        </div>
+    </form>
+
+    <!-- Actions -->
+    <div class="mb-3">
+        <a href="{{ url_for('reports') }}" class="btn btn-secondary btn-sm">Reset</a>
+        <button onclick="window.print();" class="btn btn-outline-secondary btn-sm">Print</button>
+        <a href="{{ url_for('download_reports') }}" class="btn btn-success btn-sm">Download Excel</a>
+    </div>
+
+    {% if reports %}
+    <div class="table-responsive">
+        <table class="table table-striped table-bordered">
+            <thead class="table-dark">
+                <tr>
+                    <th>#</th>
+                    <th>Facility</th>
+                    <th>Commodity</th>
+                    <th>Qty Used</th>
+                    <th>Qty Received</th>
+                    <th>Balance</th>
+                    <th>Expiry Date</th>
+                    <th>Submitted On</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set total_used = 0 %}
+                {% set total_received = 0 %}
+                {% set total_balance = 0 %}
+                {% for report in reports %}
+                {% set total_used = total_used + report.quantity_used %}
+                {% set total_received = total_received + report.quantity_received %}
+                {% set total_balance = total_balance + report.balance %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ report.facility.name }}</td>
+                    <td>{{ report.commodity.name }}</td>
+                    <td>{{ report.quantity_used }}</td>
+                    <td>{{ report.quantity_received }}</td>
+                    <td>{{ report.balance }}</td>
+                    <td>{{ report.expiry_date }}</td>
+                    <td>{{ report.date_submitted.strftime('%Y-%m-%d') }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="fw-bold bg-light">
+                    <td colspan="3" class="text-end">Totals:</td>
+                    <td>{{ total_used }}</td>
+                    <td>{{ total_received }}</td>
+                    <td>{{ total_balance }}</td>
+                    <td colspan="2"></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        No reports found.
+    </div>
+    {% endif %}
+</div>
 {% endblock %}
