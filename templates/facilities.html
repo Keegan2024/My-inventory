@@ -1,20 +1,21 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% block content %}
-<h1>Facilities</h1>
-<table class="table">
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>Name</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for facility in facilities %}
-        <tr>
-            <td>{{ facility.id }}</td>
-            <td>{{ facility.name }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<h2>Facilities</h2>
+
+<form method="POST" class="mb-4">
+    <div class="mb-3">
+        <label for="name" class="form-label">Facility Name</label>
+        <input type="text" class="form-control" id="name" name="name" required>
+    </div>
+    <button type="submit" class="btn btn-success">Add Facility</button>
+</form>
+
+<ul class="list-group">
+    {% for facility in facilities %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            {{ facility.name }}
+            <a href="{{ url_for('delete_facility', facility_id=facility.id) }}" class="btn btn-danger btn-sm">Delete</a>
+        </li>
+    {% endfor %}
+</ul>
 {% endblock %}
