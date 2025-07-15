@@ -47,6 +47,9 @@ class Report(db.Model):
     expiry_date = db.Column(db.String(20), nullable=False)
     date_submitted = db.Column(db.DateTime, default=datetime.utcnow)
 
+    facility = db.relationship('Facility')
+    commodity = db.relationship('Commodity')
+
 # ---------------------------
 # Routes
 # ---------------------------
@@ -105,10 +108,9 @@ def reports():
         flash('Please log in.', 'warning')
         return redirect(url_for('login'))
     user = User.query.filter_by(username=username).first()
-
-    # Fetch all reports submitted by this user
     user_reports = Report.query.filter_by(user_id=user.id).all()
 
+    # You can also join and show facility and commodity names if needed
     return render_template('reports.html', user=user, reports=user_reports)
 
 # ---------------------------
