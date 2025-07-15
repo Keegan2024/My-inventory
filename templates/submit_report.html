@@ -1,37 +1,89 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 
 {% block content %}
-<h2>Submit Report</h2>
+<div class="content">
+    <h2>Submit Weekly Supply Chain Report</h2>
+    
+    <form method="POST">
+        <div class="form-section">
+            <h3>Report Details</h3>
+            <div class="form-group">
+                <label>Week Number</label>
+                <input type="number" name="week_number" min="1" max="52" required>
+            </div>
+            <div class="form-group">
+                <label>Report Date</label>
+                <input type="date" name="report_date" required>
+            </div>
+        </div>
 
-<form method="post">
-    <label for="facility">Facility:</label>
-    <select name="facility_id" required>
-        {% for facility in facilities %}
-        <option value="{{ facility.id }}">{{ facility.name }}</option>
-        {% endfor %}
-    </select>
-    <br>
+        <div class="form-section">
+            <h3>Commodity Tracking</h3>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Commodity</th>
+                        <th>Opening Balance</th>
+                        <th>Total Received</th>
+                        <th>Total Dispensed</th>
+                        <th>Stock on Hand</th>
+                        <th>Expiry Date</th>
+                        <th>Remarks</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for commodity in commodities %}
+                    <tr>
+                        <td>{{ commodity.name }}</td>
+                        <td><input type="number" name="opening_balance_{{ commodity.id }}" min="0" value="0"></td>
+                        <td><input type="number" name="total_received_{{ commodity.id }}" min="0" value="0"></td>
+                        <td><input type="number" name="total_dispensed_{{ commodity.id }}" min="0" value="0"></td>
+                        <td><input type="number" name="stock_on_hand_{{ commodity.id }}" min="0" value="0"></td>
+                        <td><input type="text" name="exp_date_{{ commodity.id }}" placeholder="DD/MM/YYYY"></td>
+                        <td><input type="text" name="remarks_{{ commodity.id }}"></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
 
-    <label for="commodity">Commodity:</label>
-    <select name="commodity_id" required>
-        {% for commodity in commodities %}
-        <option value="{{ commodity.id }}">{{ commodity.name }}</option>
-        {% endfor %}
-    </select>
-    <br>
+        <div class="form-section">
+            <h3>Additional Information</h3>
+            <div class="form-group">
+                <label>Clients Seen</label>
+                <input type="number" name="clients_seen" min="0" value="0">
+            </div>
+            <div class="form-group">
+                <label>Total Screened</label>
+                <input type="number" name="screened" min="0" value="0">
+            </div>
+            <div class="form-group">
+                <label>Eligible for HEPS</label>
+                <input type="number" name="eligible_for_heps" min="0" value="0">
+            </div>
+            <div class="form-group">
+                <label>HEPS Given to Clients</label>
+                <input type="number" name="heps_given" min="0" value="0">
+            </div>
+            <div class="form-group">
+                <label>Total Refill</label>
+                <input type="number" name="total_refill" min="0" value="0">
+            </div>
+            <div class="form-group">
+                <label>HEPS Stock on Hand</label>
+                <input type="number" name="heps_stock" min="0" value="0">
+            </div>
+            <div class="form-group">
+                <label>TPT Initiations</label>
+                <input type="number" name="tpt_initiations" min="0" value="0">
+            </div>
+            <div class="form-group">
+                <label>VL Collected</label>
+                <input type="number" name="vl_collected" min="0" value="0">
+            </div>
+        </div>
 
-    <label for="quantity_used">Quantity Used:</label>
-    <input type="number" name="quantity_used" required><br>
-
-    <label for="quantity_received">Quantity Received:</label>
-    <input type="number" name="quantity_received" required><br>
-
-    <label for="balance">Balance:</label>
-    <input type="number" name="balance" required><br>
-
-    <label for="expiry_date">Expiry Date:</label>
-    <input type="date" name="expiry_date" required><br>
-
-    <button type="submit">Submit Report</button>
-</form>
+        <button type="submit" class="btn-submit">Submit Report</button>
+    </form>
+</div>
 {% endblock %}
