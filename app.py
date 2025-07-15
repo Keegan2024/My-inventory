@@ -94,6 +94,19 @@ def dashboard():
     user = User.query.filter_by(username=username).first()
     facilities = Facility.query.all()
     return render_template('dashboard.html', user=user, facilities=facilities)
+@app.route('/reports')
+def reports():
+    username = session.get('username')
+    if not username:
+        flash('Please log in.', 'warning')
+        return redirect(url_for('login'))
+    user = User.query.filter_by(username=username).first()
+    
+    # Example: You can fetch reports here from DB (if implemented)
+    # For now, just pass an empty list or None
+    reports_data = []  # Replace with actual data fetching logic
+    
+    return render_template('reports.html', user=user, reports=reports_data)
 
 @app.route('/users')
 def users():
