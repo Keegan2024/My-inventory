@@ -3,31 +3,31 @@ import logging
 from flask import Flask, render_template, redirect, url_for, request, flash, session
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.urls import url_parse
 from datetime import datetime
 
-# Initialize app
+# Initialize Flask app
 app = Flask(__name__)
 
-# Enhanced configuration
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Database configuration
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
-database_url = os.environ.get('DATABASE_URL', 'sqlite:///inventory.db')
+database_url = os.environ.get('DATABASE_URL', '')
 if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///inventory.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,
     'pool_recycle': 300
 }
 
-# Initialize extensions
 db = SQLAlchemy(app)
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Models (unchanged from your original)
+# Database Models
 class Facility(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -43,7 +43,7 @@ class User(db.Model):
     approved = db.Column(db.Boolean, default=False)
     facility_id = db.Column(db.Integer, db.ForeignKey('facility.id'))
 
-# Database initialization
+# Initialize database
 def initialize_database():
     with app.app_context():
         try:
@@ -62,23 +62,55 @@ def initialize_database():
             logger.error(f"Database initialization failed: {str(e)}")
             raise
 
-# Routes (unchanged from your original)
+# Routes
 @app.route('/')
 def home():
     return redirect(url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    if 'user_id' in session:
+        return redirect(url_for('dashboard'))
+    
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if not username or not password:
+            flash('Username and password required', 'danger')
+            return redirect(url_for('login'))
+        
         user = User.query.filter_by(username=username).first()
-        if user and check_password_hash(user.password, password) and user.approved:
-            session['user_id'] = user.id
-            flash('Login successful!', 'success')
-            return redirect(url_for('dashboard'))
-        flash('Invalid credentials or account not approved', 'danger')
+        
+        if not user or not check_password_hash(user.password, password):
+            flash('Invalid credentials', 'danger')
+            return redirect(url_for('login'))
+            
+        if not user.approved:
+            flash('Account not yet approved', 'warning')
+            return redirect(url_for('login'))
+            
+        session['user_id'] = user.id
+        next_page = request.args.get('next')
+        
+        if not next_page or url_parse(next_page).netloc != '':
+            next_page = url_for('dashboard')
+            
+        return redirect(next_page)
+    
     return render_template('login.html')
+
+@app.route('/dashboard')
+def dashboard():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user = User.query.get(session['user_id'])
+    return render_template('dashboard.html', user=user)
+
+@app.route('/logout')
+def logout():
+    session.pop('user_id', None)
+    return redirect(url_for('login'))
 
 # Initialize before first request
 @app.before_request
