@@ -1,44 +1,18 @@
 {% extends 'base.html' %}
-{% block content %}
-<h1>Reports</h1>
-<table class="table">
-    <thead>
-        <tr>
-            <th>Commodity</th>
-            <th>Used</th>
-            <th>Received</th>
-            <th>Balance</th>
-            <th>Expiry Date</th>
-            <th>Date Submitted</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for report in reports %}
-        <tr>
-            <td>{{ report.commodity_id }}</td>
-            <td>{{ report.quantity_used }}</td>
-            <td>{{ report.quantity_received }}</td>
-            <td>{{ report.balance }}</td>
-            <td>{{ report.expiry_date }}</td>
-            <td>{{ report.date_submitted.strftime('%Y-%m-%d') }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-{% endblock %}
 
-{% extends 'base.html' %}
 {% block content %}
-<div class="container mt-4">
-    <h2>Reports</h2>
-    <ul class="list-group">
-        {% for report in reports %}
-        <li class="list-group-item">
-            Report #{{ report.id }} — Submitted on {{ report.date_submitted.strftime('%Y-%m-%d') }}
-        </li>
-        {% else %}
-        <li class="list-group-item">No reports found.</li>
-        {% endfor %}
-    </ul>
+<div class="container mt-5">
+    <h1>Reports</h1>
+    <p>Welcome, {{ user.username }}. This is the reports page.</p>
+    
+    {% if reports %}
+      <ul>
+      {% for report in reports %}
+        <li>{{ report }}</li>
+      {% endfor %}
+      </ul>
+    {% else %}
+      <p>No reports to show.</p>
+    {% endif %}
 </div>
 {% endblock %}
