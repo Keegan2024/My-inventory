@@ -8,7 +8,51 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventory.db'
 db = SQLAlchemy(app)
+from flask import abort  # add this import at top
 
+# Edit facility
+@app.route('/facilities/edit/<int:facility_id>', methods=['GET', 'POST'])
+def edit_facility(facility_id):
+    username = session.get('username')
+    if not username:
+        flash('Please log in.', 'warning')
+        return redirect(url_for('login'))
+    user = User.query.filter_by(username=username).first()
+    if user.role not in ['admin', 'master_admin']:
+        flash('Unauthorized access.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    facility = Facility.query.get_or_404(facility_id)
+
+    if request.method == 'POST':
+        facility.name = request.form['name']
+        facility.province = request.form['province']
+        facility.district = request.form['district']
+        facility.hub = request.form.get('hub') or None
+
+        db.session.commit()
+        flash('Facility updated successfully.', 'success')
+        return redirect(url_for('facilities'))
+
+    return render_template('edit_facility.html', user=user, facility=facility)
+
+# Delete facility
+@app.route('/facilities/delete/<int:facility_id>', methods=['POST'])
+def delete_facility(facility_id):
+    username = session.get('username')
+    if not username:
+        flash('Please log in.', 'warning')
+        return redirect(url_for('login'))
+    user = User.query.filter_by(username=username).first()
+    if user.role not in ['admin', 'master_admin']:
+        flash('Unauthorized access.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    facility = Facility.query.get_or_404(facility_id)
+    db.session.delete(facility)
+    db.session.commit()
+    flash('Facility deleted successfully.', 'success')
+    return redirect(url_for('facilities'))
 # ---------------------------
 # Database models
 # ---------------------------
