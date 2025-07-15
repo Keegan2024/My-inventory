@@ -22,17 +22,3 @@
     </tbody>
 </table>
 {% endblock %}
-
-{% extends 'base.html' %}
-{% block content %}
-<div class="container mt-4">
-    <h2>Commodities</h2>
-    <ul class="list-group">
-        {% for commodity in commodities %}
-        <li class="list-group-item">{{ commodity.name }} - {{ commodity.description }}</li>
-        {% else %}
-        <li class="list-group-item">No commodities found.</li>
-        {% endfor %}
-    </ul>
-</div>
-{% endblock %}
