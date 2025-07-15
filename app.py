@@ -20,9 +20,7 @@ class Facility(db.Model):
 class Commodity(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    description = db.Column(db.String(255))
-    unit = db.Column(db.String(50))
-    expiry_date = db.Column(db.String(20))
+    description = db.Column(db.String(200), nullable=True)
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -81,103 +79,50 @@ def login():
             flash('Invalid username or password.', 'danger')
     return render_template('login.html')
 
-@app.route('/logout')
-def logout():
-    session.pop('username', None)
-    flash('Logged out successfully.', 'success')
-    return redirect(url_for('login'))
-
 @app.route('/dashboard')
 def dashboard():
     username = session.get('username')
     if not username:
-        flash('Please login first.', 'warning')
+        flash('Please log in.', 'warning')
         return redirect(url_for('login'))
     user = User.query.filter_by(username=username).first()
-    return render_template('dashboard.html', user=user)
-
-@app.route('/commodities')
-def commodities():
-    username = session.get('username')
-    if not username:
-        flash('Please login first.', 'warning')
-        return redirect(url_for('login'))
-    commodities = Commodity.query.all()
-    user = User.query.filter_by(username=username).first()
-    return render_template('commodities.html', commodities=commodities, user=user)
-
-@app.route('/submit_report', methods=['GET', 'POST'])
-def submit_report():
-    username = session.get('username')
-    if not username:
-        flash('Please login first.', 'warning')
-        return redirect(url_for('login'))
-    user = User.query.filter_by(username=username).first()
-    commodities = Commodity.query.all()
-    if request.method == 'POST':
-        commodity_id = request.form.get('commodity_id')
-        quantity_used = int(request.form.get('quantity_used'))
-        quantity_received = int(request.form.get('quantity_received'))
-        balance = int(request.form.get('balance'))
-        expiry_date = request.form.get('expiry_date')
-
-        report = Report(
-            user_id=user.id,
-            facility_id=user.facility_id,
-            commodity_id=commodity_id,
-            quantity_used=quantity_used,
-            quantity_received=quantity_received,
-            balance=balance,
-            expiry_date=expiry_date
-        )
-        db.session.add(report)
-        db.session.commit()
-        flash('Report submitted successfully.', 'success')
-        return redirect(url_for('dashboard'))
-    return render_template('submit_report.html', commodities=commodities, user=user)
-
-@app.route('/reports')
-def reports():
-    username = session.get('username')
-    if not username:
-        flash('Please login first.', 'warning')
-        return redirect(url_for('login'))
-    user = User.query.filter_by(username=username).first()
-    if user.role == 'master_admin':
-        all_reports = Report.query.all()
-    else:
-        all_reports = Report.query.filter_by(facility_id=user.facility_id).all()
-    return render_template('reports.html', reports=all_reports, user=user)
-
-@app.route('/facilities')
-def facilities():
-    username = session.get('username')
-    if not username:
-        flash('Please login first.', 'warning')
-        return redirect(url_for('login'))
-    user = User.query.filter_by(username=username).first()
-    if user.role != 'master_admin':
-        flash('Access denied.', 'danger')
-        return redirect(url_for('dashboard'))
-    all_facilities = Facility.query.all()
-    return render_template('facilities.html', facilities=all_facilities, user=user)
+    facilities = Facility.query.all()
+    return render_template('dashboard.html', user=user, facilities=facilities)
 
 @app.route('/users')
 def users():
     username = session.get('username')
     if not username:
-        flash('Please login first.', 'warning')
+        flash('Please log in.', 'warning')
         return redirect(url_for('login'))
     user = User.query.filter_by(username=username).first()
-    if user.role != 'master_admin':
-        flash('Access denied.', 'danger')
+    if user.role != 'admin' and user.role != 'master_admin':
+        flash('Unauthorized access.', 'danger')
         return redirect(url_for('dashboard'))
-    all_users = User.query.all()
-    return render_template('users.html', users=all_users, user=user)
+    users = User.query.all()
+    return render_template('users.html', users=users)
 
-@app.route('/help')
-def help_page():
-    return render_template('help.html')
+@app.route('/approve_user/<int:user_id>')
+def approve_user(user_id):
+    user = User.query.get_or_404(user_id)
+    user.approved = True
+    db.session.commit()
+    flash(f'User {user.username} approved!', 'success')
+    return redirect(url_for('users'))
+
+@app.route('/reject_user/<int:user_id>')
+def reject_user(user_id):
+    user = User.query.get_or_404(user_id)
+    db.session.delete(user)
+    db.session.commit()
+    flash(f'User {user.username} rejected and deleted!', 'danger')
+    return redirect(url_for('users'))
+
+@app.route('/logout')
+def logout():
+    session.pop('username', None)
+    flash('Logged out successfully.', 'success')
+    return redirect(url_for('login'))
 
 # ---------------------------
 # Database initialization
@@ -185,19 +130,20 @@ def help_page():
 
 with app.app_context():
     db.create_all()
+
     # Create or update master admin user
-    master_admin = User.query.filter_by(username='Keegan').first()
-    if master_admin:
-        master_admin.password = generate_password_hash('44665085')
-        master_admin.role = 'master_admin'
-        master_admin.approved = True
+    admin_user = User.query.filter_by(username='Keegan').first()
+    if admin_user:
+        admin_user.password = generate_password_hash('44665085')
+        admin_user.role = 'master_admin'
+        admin_user.approved = True
         db.session.commit()
-        print("✅ Master admin 'Keegan' updated!")
+        print("✅ User 'Keegan' updated as master admin!")
     else:
         new_admin = User(username='Keegan', password=generate_password_hash('44665085'), role='master_admin', approved=True)
         db.session.add(new_admin)
         db.session.commit()
-        print("✅ Master admin 'Keegan' created!")
+        print("✅ User 'Keegan' created as master admin!")
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
