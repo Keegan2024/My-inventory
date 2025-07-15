@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="content">
+    <h2>Weekly Reports</h2>
+    
+    {% for week_number, week_data in weeks.items() %}
+    <div class="report-week">
+        <h3>Week {{ week_number }} - {{ week_data.date.strftime('%Y-%m-%d') }}</h3>
+        
+        <h4>Commodity Tracking</h4>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Commodity</th>
+                    <th>Opening Balance</th>
+                    <th>Received</th>
+                    <th>Dispensed</th>
+                    <th>Stock on Hand</th>
+                    <th>Expiry Date</th>
+                    <th>Remarks</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for report in week_data.reports %}
+                <tr>
+                    <td>{{ report.commodity.name }}</td>
+                    <td>{{ report.opening_balance }}</td>
+                    <td>{{ report.total_received }}</td>
+                    <td>{{ report.total_dispensed }}</td>
+                    <td>{{ report.stock_on_hand }}</td>
+                    <td>{{ report.exp_date if report.exp_date else '' }}</td>
+                    <td>{{ report.remarks if report.remarks else '' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <h4>Summary</h4>
+        <div class="summary-grid">
+            <div class="summary-item">
+                <span class="summary-label">Clients Seen:</span>
+                <span class="summary-value">{{ week_data.summary.clients_seen }}</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Screened:</span>
+                <span class="summary-value">{{ week_data.summary.screened }}</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Eligible for HEPS:</span>
+                <span class="summary-value">{{ week_data.summary.eligible_for_heps }}</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">HEPS Given:</span>
+                <span class="summary-value">{{ week_data.summary.heps_given }}</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Total Refill:</span>
+                <span class="summary-value">{{ week_data.summary.total_refill }}</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">HEPS Stock:</span>
+                <span class="summary-value">{{ week_data.summary.heps_stock }}</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">TPT Initiations:</span>
+                <span class="summary-value">{{ week_data.summary.tpt_initiations }}</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">VL Collected:</span>
+                <span class="summary-value">{{ week_data.summary.vl_collected }}</span>
+            </div>
+        </div>
+    </div>
+    <hr>
+    {% endfor %}
+</div>
+{% endblock %}
