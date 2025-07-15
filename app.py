@@ -229,6 +229,10 @@ def submit_report():
     user = User.query.filter_by(username=username).first()
     return render_template('submit_report.html', user=user)
 
+@app.route('/help', endpoint='help_page')
+def help_page():
+    return render_template('help.html')
+
 @app.route('/logout')
 def logout():
     session.pop('username', None)
