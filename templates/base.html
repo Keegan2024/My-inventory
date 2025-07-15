@@ -1,46 +1,62 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Inventory System</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>{% block title %}Inventory System{% endblock %}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a5276;
+            margin: 0;
+            padding: 0;
+            color: white;
+        }
+        .header {
+            background-color: #154360;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+        .nav-container {
+            display: flex;
+            justify-content: center;
+            background-color: #1a5276;
+            padding: 15px 0;
+        }
+        .nav-link {
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            margin: 0 10px;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        .nav-link:hover {
+            background-color: #21618c;
+        }
+        .content {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            color: #333;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+    </style>
 </head>
-<body style="background-color: #f8f9fa;">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="{{ url_for('dashboard') }}">Inventory</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('commodities') }}">Commodities</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('submit_report') }}">Submit Report</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('reports') }}">Reports</a></li>
-                    {% if user and user.role == 'master_admin' %}
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('facilities') }}">Facilities</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('users') }}">Users</a></li>
-                    {% endif %}
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('help_page') }}">Help</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}">Logout</a></li>
-                </ul>
-            </div>
-        </div>
-    </nav>
-    <div class="container mt-4">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        {% block content %}{% endblock %}
+<body>
+    <div class="header">
+        <h1>Inventory Management System</h1>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <div class="nav-container">
+        <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+        <a href="{{ url_for('inventory') }}" class="nav-link">Inventory</a>
+        <a href="{{ url_for('reports') }}" class="nav-link">Reports</a>
+        <a href="{{ url_for('settings') }}" class="nav-link">Settings</a>
+        <a href="{{ url_for('logout') }}" class="nav-link">Logout</a>
+    </div>
+    
+    {% block content %}{% endblock %}
 </body>
 </html>
