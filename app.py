@@ -4,11 +4,15 @@ from flask import Flask, render_template, redirect, url_for, request, flash, ses
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.urls import url_parse
-from datetime import datetime
 
+# Initialize Flask app
 app = Flask(__name__)
 
-# Configuration
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Database configuration
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
 database_url = os.environ.get('DATABASE_URL', '').replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///inventory.db'
@@ -16,7 +20,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# Models (unchanged from your original)
+# Database Models
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -24,38 +28,8 @@ class User(db.Model):
     role = db.Column(db.String(20), default='user')
     approved = db.Column(db.Boolean, default=False)
 
-# Add the missing signup route
-@app.route('/signup', methods=['GET', 'POST'])
-def signup():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        
-        if not username or not password:
-            flash('Username and password required', 'danger')
-            return redirect(url_for('signup'))
-        
-        if User.query.filter_by(username=username).first():
-            flash('Username already exists', 'danger')
-            return redirect(url_for('signup'))
-            
-        new_user = User(
-            username=username,
-            password=generate_password_hash(password),
-            approved=False  # Admin needs to approve new users
-        )
-        
-        db.session.add(new_user)
-        db.session.commit()
-        flash('Signup successful! Waiting for admin approval', 'success')
-        return redirect(url_for('login'))
-    
-    return render_template('signup.html')
-
-# Your existing routes (login, dashboard, logout) remain unchanged
-# ...
-
-if __name__ == '__main__':
+# Initialize database
+def initialize_database():
     with app.app_context():
         db.create_all()
         if not User.query.filter_by(username='admin').first():
@@ -67,5 +41,61 @@ if __name__ == '__main__':
             )
             db.session.add(admin)
             db.session.commit()
+            logger.info("Database initialized with admin user")
+
+# Routes
+@app.route('/')
+def home():
+    return redirect(url_for('login'))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if 'user_id' in session:
+        return redirect(url_for('dashboard'))
+    
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        
+        if not username or not password:
+            flash('Username and password required', 'danger')
+            return redirect(url_for('login'))
+        
+        user = User.query.filter_by(username=username).first()
+        
+        if not user or not check_password_hash(user.password, password):
+            flash('Invalid credentials', 'danger')
+            return redirect(url_for('login'))
+            
+        if not user.approved:
+            flash('Account not yet approved', 'warning')
+            return redirect(url_for('login'))
+            
+        session['user_id'] = user.id
+        next_page = request.args.get('next')
+        
+        if not next_page or url_parse(next_page).netloc != '':
+            next_page = url_for('dashboard')
+            
+        return redirect(next_page)
+    
+    return render_template('login.html')
+
+@app.route('/dashboard')
+def dashboard():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user = User.query.get(session['user_id'])
+    return render_template('dashboard.html', user=user)
+
+@app.route('/logout')
+def logout():
+    session.pop('user_id', None)
+    return redirect(url_for('login'))
+
+# Initialize database before first request
+initialize_database()
+
+if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
