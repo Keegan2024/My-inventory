@@ -94,6 +94,10 @@ def dashboard():
     user = User.query.filter_by(username=username).first()
     facilities = Facility.query.all()
     return render_template('dashboard.html', user=user, facilities=facilities)
+# ---------------------------
+# Reports page (view submitted reports)
+# ---------------------------
+
 @app.route('/reports')
 def reports():
     username = session.get('username')
@@ -101,12 +105,52 @@ def reports():
         flash('Please log in.', 'warning')
         return redirect(url_for('login'))
     user = User.query.filter_by(username=username).first()
-    
-    # Example: You can fetch reports here from DB (if implemented)
-    # For now, just pass an empty list or None
-    reports_data = []  # Replace with actual data fetching logic
-    
-    return render_template('reports.html', user=user, reports=reports_data)
+
+    # Fetch all reports submitted by this user
+    user_reports = Report.query.filter_by(user_id=user.id).all()
+
+    return render_template('reports.html', user=user, reports=user_reports)
+
+# ---------------------------
+# Submit report page (form and save logic)
+# ---------------------------
+
+@app.route('/submit_report', methods=['GET', 'POST'])
+def submit_report():
+    username = session.get('username')
+    if not username:
+        flash('Please log in.', 'warning')
+        return redirect(url_for('login'))
+    user = User.query.filter_by(username=username).first()
+
+    # Get all facilities and commodities to fill dropdowns
+    facilities = Facility.query.all()
+    commodities = Commodity.query.all()
+
+    if request.method == 'POST':
+        facility_id = request.form.get('facility_id')
+        commodity_id = request.form.get('commodity_id')
+        quantity_used = int(request.form.get('quantity_used', 0))
+        quantity_received = int(request.form.get('quantity_received', 0))
+        balance = int(request.form.get('balance', 0))
+        expiry_date = request.form.get('expiry_date')
+
+        # Create and save the report
+        report = Report(
+            user_id=user.id,
+            facility_id=facility_id,
+            commodity_id=commodity_id,
+            quantity_used=quantity_used,
+            quantity_received=quantity_received,
+            balance=balance,
+            expiry_date=expiry_date
+        )
+        db.session.add(report)
+        db.session.commit()
+        flash('Report submitted successfully.', 'success')
+        return redirect(url_for('reports'))
+
+    return render_template('submit_report.html', user=user, facilities=facilities, commodities=commodities)
 
 @app.route('/users')
 def users():
