@@ -20,5 +20,8 @@
     </div>
     <button type="submit" class="btn btn-success">Update</button>
     <a href="{{ url_for('facilities') }}" class="btn btn-secondary">Cancel</a>
+    <li class="list-group-item">
+  <a href="{{ url_for('edit_facility', facility_id=f.id) }}">{{ f.name }}</a>
+</li>
 </form>
 {% endblock %}
