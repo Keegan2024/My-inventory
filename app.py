@@ -1,18 +1,13 @@
+```python
 import os
 import io
 import csv
+import json
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, session, make_response, send_file
 from flask_sqlalchemy import SQLAlchemy
-from flask_wtf import FlaskForm
 from flask_migrate import Migrate
-
-# ... other imports and app setup ...
-
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
-
-# ... rest of your app.py code ...
+from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, DateField, SelectField, IntegerField, TextAreaField, SubmitField
 from wtforms.validators import DataRequired, Length, NumberRange
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -26,7 +21,6 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 import logging
-import json
 
 app = Flask(__name__)
 
@@ -47,6 +41,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 cache = Cache(app)
 limiter = Limiter(app, key_func=get_remote_address, default_limits=["200 per day", "50 per hour"])
 
@@ -379,7 +374,11 @@ def analytics():
 
     commodity_id = request.args.get('commodity_id', type=int)
     if not commodity_id:
-        commodity_id = Commodity.query.first().id
+        commodity = Commodity.query.first()
+        if not commodity:
+            flash('No commodities available.', 'warning')
+            return redirect(url_for('dashboard'))
+        commodity_id = commodity.id
 
     commodity = Commodity.query.get(commodity_id)
     reports = ReportItem.query.join(Report).filter(
@@ -388,15 +387,34 @@ def analytics():
     ).order_by(Report.report_date.asc()).all()
 
     chart_data = {
-        'labels': [r.report.report_date.strftime('%Y-%m-%d') for r in reports],
-        'datasets': [{
-            'label': f'{commodity.name} Closing Balance',
-            'data': [r.closing_balance for r in reports],
-            'borderColor': '#007bff',
-            'backgroundColor': 'rgba(0, 123, 255, 0.1)',
-            'fill': True,
-            'tension': 0.4
-        }]
+        'type': 'line',
+        'data': {
+            'labels': [r.report.report_date.strftime('%Y-%m-%d') for r in reports],
+            'datasets': [{
+                'label': f'{commodity.name} Closing Balance',
+                'data': [r.closing_balance for r in reports],
+                'borderColor': '#007bff',
+                'backgroundColor': 'rgba(0, 123, 255, 0.1)',
+                'fill': True,
+                'tension': 0.4
+            }]
+        },
+        'options': {
+            'responsive': True,
+            'scales': {
+                'y': {
+                    'beginAtZero': True,
+                    'title': {'display': True, 'text': 'Closing Balance'}
+                },
+                'x': {
+                    'title': {'display': True, 'text': 'Report Date'}
+                }
+            },
+            'plugins': {
+                'legend': {'position': 'top'},
+                'title': {'display': True, 'text': f'{commodity.name} Inventory Trend'}
+            }
+        }
     }
     return render_template('analytics.html', chart_data=json.dumps(chart_data), commodities=Commodity.query.all(), selected_commodity=commodity, user=user)
 
@@ -495,3 +513,4 @@ def shutdown_session(exception=None):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=os.environ.get('FLASK_ENV', 'development') == 'development')
+```
