@@ -1,34 +1,31 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Submit Report - Luapula Supply Chain</title>
-  <link rel="stylesheet" href="/css/styles.css">
-</head>
-<body>
-  <div class="container">
-    <h1>Submit Report</h1>
-    <form action="/submit-report" method="POST">
-      <div>
-        <label>Facility ID:</label>
-        <input type="number" name="facilityId" required>
-      </div>
-      <div>
-        <label>Commodity ID:</label>
-        <input type="number" name="commodityId" required>
-      </div>
-      <div>
-        <label>Quantity:</label>
-        <input type="number" name="quantity" required>
-      </div>
-      <div>
-        <label>Report Date:</label>
-        <input type="date" name="reportDate" required>
-      </div>
-      <button type="submit">Submit</button>
-    </form>
-    <a href="/dashboard">Back to Dashboard</a>
+{% extends "base.html" %}
+{% block title %}Submit Report{% endblock %}
+{% block content %}
+<h2>Submit Report</h2>
+<form method="POST">
+  {{ form.hidden_tag() }}
+  <div class="mb-3">
+    {{ form.report_date.label }} {{ form.report_date(class="form-control") }}
   </div>
-</body>
-</html>
+  <div class="mb-3">
+    {{ form.report_period.label }} {{ form.report_period(class="form-control") }}
+  </div>
+
+  {% for cid, item_form in item_forms.items() %}
+    <fieldset class="border p-3 mb-3">
+      <legend>{{ commodities|selectattr("id", "equalto", cid)|first.name }}</legend>
+      {{ item_form.hidden_tag() }}
+      <div class="row">
+        <div class="col">{{ item_form.opening_balance.label }} {{ item_form.opening_balance(class="form-control") }}</div>
+        <div class="col">{{ item_form.received.label }} {{ item_form.received(class="form-control") }}</div>
+        <div class="col">{{ item_form.used.label }} {{ item_form.used(class="form-control") }}</div>
+        <div class="col">{{ item_form.closing_balance.label }} {{ item_form.closing_balance(class="form-control") }}</div>
+      </div>
+      <div class="mt-2">{{ item_form.exp_date.label }} {{ item_form.exp_date(class="form-control") }}</div>
+      <div class="mt-2">{{ item_form.remarks.label }} {{ item_form.remarks(class="form-control") }}</div>
+    </fieldset>
+  {% endfor %}
+
+  <button type="submit" class="btn btn-success">Submit</button>
+</form>
+{% endblock %}
