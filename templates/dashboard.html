@@ -1,22 +1,64 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Dashboard</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Luapula Supply Chain</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
 </head>
 <body>
-    <h2>Welcome, {{ user.username }}</h2>
-    <a href="{{ url_for('submit_report') }}">Submit Report</a> |
-    <a href="{{ url_for('logout') }}">Logout</a>
-
-    <h3>Recent Reports</h3>
-    {% if reports %}
-        <ul>
-        {% for report in reports %}
-            <li>{{ report.report_date }} — {{ report.report_period }}</li>
-        {% endfor %}
-        </ul>
-    {% else %}
-        <p>No reports found.</p>
-    {% endif %}
+    <div class="container">
+        <h1 class="mt-5">Dashboard - {{ user.username }}</h1>
+        <a href="{{ url_for('logout') }}" class="btn btn-secondary mb-3">Logout</a>
+        <a href="{{ url_for('submit_report') }}" class="btn btn-primary mb-3">Submit Report</a>
+        {% if user.role in ['auditor', 'admin'] %}
+            <a href="{{ url_for('view_reports') }}" class="btn btn-info mb-3">View Reports</a>
+            <a href="{{ url_for('analytics') }}" class="btn btn-info mb-3">Analytics</a>
+            {% if user.role == 'admin' %}
+                <a href="{{ url_for('import_reports') }}" class="btn btn-info mb-3">Import Reports</a>
+            {% endif %}
+            <a href="{{ url_for('export_reports') }}" class="btn btn-info mb-3">Export Reports</a>
+        {% endif %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        <h2>Recent Reports</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Date</th>
+                    <th>Period</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for report in reports.items %}
+                    <tr>
+                        <td>{{ report.id }}</td>
+                        <td>{{ report.report_date }}</td>
+                        <td>{{ report.report_period }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if reports.has_prev or reports.has_next %}
+            <nav aria-label="Page navigation">
+                <ul class="pagination">
+                    {% if reports.has_prev %}
+                        <li class="page-item"><a class="page-link" href="{{ url_for('dashboard', page=reports.prev_num) }}">Previous</a></li>
+                    {% endif %}
+                    {% if reports.has_next %}
+                        <li class="page-item"><a class="page-link" href="{{ url_for('dashboard', page=reports.next_num) }}">Next</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        {% endif %}
+    </div>
 </body>
 </html>
+```
