@@ -1,56 +1,21 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Supply Chain System - {% block title %}{% endblock %}</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5; }
-        .header { background-color: #2c3e50; color: white; padding: 15px 20px; }
-        .nav { background-color: #34495e; padding: 10px 20px; }
-        .nav a { color: white; text-decoration: none; margin-right: 15px; }
-        .nav a:hover { text-decoration: underline; }
-        .content { padding: 20px; max-width: 1200px; margin: 20px auto; background: white; min-height: 80vh; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        
-        .btn { display: inline-block; padding: 10px 15px; text-decoration: none; border-radius: 4px; margin: 5px; }
-        .btn-primary { background: #3498db; color: white; }
-        .btn-secondary { background: #95a5a6; color: white; }
-        .btn-submit { background: #2ecc71; color: white; padding: 10px 20px; border: none; cursor: pointer; }
-        
-        .table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-        .table th, .table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        .table th { background-color: #f2f2f2; }
-        
-        .form-section { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .form-group input { padding: 8px; width: 100%; max-width: 300px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 4px; }
-        
-        .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
-        .summary-item { background: #f9f9f9; padding: 10px; border-radius: 4px; }
-        .summary-label { font-weight: bold; display: block; }
-        .summary-value { font-size: 1.2em; }
-        
-        .report-week { margin-bottom: 30px; }
-    </style>
+    <meta charset="UTF-8">
+    <title>My Inventory System</title>
 </head>
 <body>
-    <div class="header">
-        <h1>Supply Chain Weekly Tracker</h1>
-    </div>
-    <div class="nav">
+    <nav>
         <a href="{{ url_for('dashboard') }}">Dashboard</a>
         <a href="{{ url_for('submit_report') }}">Submit Report</a>
-        <a href="{{ url_for('dashboard') }}">Dashboard</a>
-        <a href="{{ url_for('logout') }}" style="float: right;">Logout</a>
-    </div>
-    <div class="content">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        {% block content %}{% endblock %}
-    </div>
+        <a href="{{ url_for('login') }}">Login</a>
+    </nav>
+    <hr>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <p style="color:red;">{{ message }}</p>
+        {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
 </body>
 </html>
