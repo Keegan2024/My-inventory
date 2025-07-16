@@ -22,6 +22,7 @@
                     {% if user.role in ['auditor', 'admin'] %}
                         <a href="{{ url_for('view_reports') }}" class="hover:underline">View Reports</a>
                         <a href="{{ url_for('analytics') }}" class="hover:underline">Analytics</a>
+                        <a href="{{ url_for('manage_users') }}" class="hover:underline">Manage Users</a>
                     {% endif %}
                     {% if user.role == 'admin' %}
                         <a href="{{ url_for('add_commodity') }}" class="hover:underline">Add Commodity</a>
