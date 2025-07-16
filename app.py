@@ -2,13 +2,14 @@ import os
 import io
 import csv
 import json
+import uuid
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, session, make_response, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, DateField, SelectField, IntegerField, TextAreaField, SubmitField, FileField
-from wtforms.validators import DataRequired, Length, NumberRange, ValidationError
+from wtforms.validators import DataRequired, Length, NumberRange, ValidationError, EqualTo
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_caching import Cache
 from flask_limiter import Limiter
@@ -17,7 +18,6 @@ import pandas as pd
 import openpyxl
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 import logging
-from sqlalchemy import func
 
 app = Flask(__name__)
 
@@ -49,6 +49,9 @@ class User(db.Model):
     facility_id = db.Column(db.Integer, db.ForeignKey('facility.id'), nullable=False)
     role = db.Column(db.String(20), nullable=False, default='user')  # user, admin, facility_manager, auditor
     approved = db.Column(db.Boolean, default=False)
+    phone_number = db.Column(db.String(20))  # For password reset
+    reset_token = db.Column(db.String(100), unique=True)
+    reset_token_expiry = db.Column(db.DateTime)
     facility = db.relationship('Facility', backref='users')
     reports = db.relationship('Report', backref='user', lazy=True)
     audit_logs = db.relationship('AuditLog', backref='user', lazy=True)
@@ -115,6 +118,27 @@ class LoginForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=3, max=80)])
     password = PasswordField('Password', validators=[DataRequired(), Length(min=6)])
     submit = SubmitField('Login')
+
+class SignupForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired(), Length(min=3, max=80)])
+    password = PasswordField('Password', validators=[DataRequired(), Length(min=6)])
+    confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password')])
+    phone_number = StringField('Phone Number', validators=[DataRequired(), Length(min=10, max=20)])
+    province_id = SelectField('Province', coerce=int, validators=[DataRequired()])
+    hub_id = SelectField('Hub', coerce=int, validators=[DataRequired()])
+    district_id = SelectField('District', coerce=int, validators=[DataRequired()])
+    facility_id = SelectField('Facility', coerce=int, validators=[DataRequired()])
+    submit = SubmitField('Sign Up')
+
+class ForgotPasswordForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired(), Length(min=3, max=80)])
+    phone_number = StringField('Phone Number', validators=[DataRequired(), Length(min=10, max=20)])
+    submit = SubmitField('Request Password Reset')
+
+class ResetPasswordForm(FlaskForm):
+    password = PasswordField('New Password', validators=[DataRequired(), Length(min=6)])
+    confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password')])
+    submit = SubmitField('Reset Password')
 
 class ReportForm(FlaskForm):
     province_id = SelectField('Province', coerce=int, validators=[DataRequired()])
@@ -221,7 +245,8 @@ def initialize_database():
                     password=generate_password_hash(admin_password),
                     facility_id=admin_facility.id,
                     role='admin',
-                    approved=True
+                    approved=True,
+                    phone_number='0972511451'
                 )
                 db.session.add(admin)
                 db.session.add(AuditLog(user_id=admin.id, action='create_admin', details='Admin user created'))
@@ -310,6 +335,9 @@ def check_permission(user, required_role):
         return False
     return True
 
+def generate_reset_token():
+    return str(uuid.uuid4())
+
 def parse_excel(file):
     wb = openpyxl.load_workbook(file)
     sheet = wb['WEEK 1']
@@ -335,9 +363,9 @@ def parse_excel(file):
 # Routes
 @app.route('/')
 def home():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    return redirect(url_for('dashboard'))
+    if 'user_id' in session:
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("5 per minute")
@@ -359,15 +387,118 @@ def login():
         flash('Invalid credentials.', 'danger')
     return render_template('login.html', form=form)
 
-@app.route('/logout')
-def logout():
-    user_id = session.get('user_id')
-    session.clear()
-    if user_id:
-        db.session.add(AuditLog(user_id=user_id, action='logout', details='User logged out'))
-        db.session.commit()
-    flash('Logged out successfully.', 'info')
-    return redirect(url_for('login'))
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    form = SignupForm()
+    form.province_id.choices = [(p.id, p.name) for p in Province.query.all()]
+    form.hub_id.choices = [(h.id, h.name) for h in Hub.query.filter_by(province_id=form.province_id.data or Province.query.first().id).all()]
+    form.district_id.choices = [(d.id, d.name) for d in District.query.filter_by(hub_id=form.hub_id.data or Hub.query.first().id).all()]
+    form.facility_id.choices = [(f.id, f.name) for f in Facility.query.filter_by(district_id=form.district_id.data or District.query.first().id).all()]
+
+    if form.validate_on_submit():
+        try:
+            user = User(
+                username=form.username.data.strip(),
+                password=generate_password_hash(form.password.data),
+                phone_number=form.phone_number.data.strip(),
+                facility_id=form.facility_id.data,
+                role='user',
+                approved=False
+            )
+            db.session.add(user)
+            db.session.add(AuditLog(user_id=user.id, action='signup_request', details=f'User {user.username} requested account'))
+            db.session.commit()
+            flash('Sign-up request submitted. Awaiting auditor approval.', 'success')
+            return redirect(url_for('login'))
+        except IntegrityError:
+            db.session.rollback()
+            flash('Username already exists.', 'danger')
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            logger.error(f"Signup error: {str(e)}")
+            flash(f'Failed to submit sign-up request: {str(e)}', 'danger')
+    return render_template('signup.html', form=form)
+
+@app.route('/forgot-password', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
+def forgot_password():
+    form = ForgotPasswordForm()
+    if form.validate_on_submit():
+        username = form.username.data.strip()
+        phone_number = form.phone_number.data.strip()
+        user = User.query.filter_by(username=username, phone_number=phone_number).first()
+        if user:
+            # Simulate sending reset link (actual SMS would require Twilio or similar)
+            reset_token = generate_reset_token()
+            user.reset_token = reset_token
+            user.reset_token_expiry = datetime.utcnow() + timedelta(hours=1)
+            db.session.add(AuditLog(user_id=user.id, action='password_reset_request', details=f'Password reset requested for {username}'))
+            db.session.commit()
+            flash(f'A password reset link has been sent to {phone_number}.', 'success')
+            # In production, integrate with an SMS service to send: url_for('reset_password', token=reset_token, _external=True)
+        else:
+            flash('Invalid username or phone number.', 'danger')
+    return render_template('forgot_password.html', form=form)
+
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    user = User.query.filter_by(reset_token=token).first()
+    if not user or user.reset_token_expiry < datetime.utcnow():
+        flash('Invalid or expired reset token.', 'danger')
+        return redirect(url_for('forgot_password'))
+
+    form = ResetPasswordForm()
+    if form.validate_on_submit():
+        try:
+            user.password = generate_password_hash(form.password.data)
+            user.reset_token = None
+            user.reset_token_expiry = None
+            db.session.add(AuditLog(user_id=user.id, action='password_reset', details=f'Password reset for {user.username}'))
+            db.session.commit()
+            flash('Password reset successfully. Please log in.', 'success')
+            return redirect(url_for('login'))
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            logger.error(f"Password reset error: {str(e)}")
+            flash(f'Failed to reset password: {str(e)}', 'danger')
+    return render_template('reset_password.html', form=form, token=token)
+
+@app.route('/manage-users', methods=['GET', 'POST'])
+def manage_users():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user = User.query.get(session['user_id'])
+    if not check_permission(user, 'auditor'):
+        return redirect(url_for('dashboard'))
+
+    if request.method == 'POST':
+        user_id = request.form.get('user_id', type=int)
+        action = request.form.get('action')
+        target_user = User.query.get(user_id)
+        if not target_user:
+            flash('User not found.', 'danger')
+            return redirect(url_for('manage_users'))
+
+        try:
+            if action == 'approve':
+                target_user.approved = True
+                db.session.add(AuditLog(user_id=user.id, action='approve_user', details=f'Approved user {target_user.username}'))
+            elif action == 'reject':
+                target_user.approved = False
+                db.session.add(AuditLog(user_id=user.id, action='reject_user', details=f'Rejected user {target_user.username}'))
+            elif action == 'delete':
+                db.session.delete(target_user)
+                db.session.add(AuditLog(user_id=user.id, action='delete_user', details=f'Deleted user {target_user.username}'))
+            db.session.commit()
+            flash(f'User {target_user.username} {action}d successfully.', 'success')
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            logger.error(f"User management error: {str(e)}")
+            flash(f'Failed to {action} user: {str(e)}', 'danger')
+        return redirect(url_for('manage_users'))
+
+    users = User.query.all()
+    return render_template('manage_users.html', users=users, user=user)
 
 @app.route('/dashboard')
 def dashboard():
@@ -384,11 +515,21 @@ def dashboard():
     provinces = Province.query.all()
     return render_template('dashboard.html', user=user, reports=reports, provinces=provinces)
 
+@app.route('/logout')
+def logout():
+    user_id = session.get('user_id')
+    session.clear()
+    if user_id:
+        db.session.add(AuditLog(user_id=user_id, action='logout', details='User logged out'))
+        db.session.commit()
+    flash('Logged out successfully.', 'info')
+    return redirect(url_for('login'))
+
 @app.route('/submit-report', methods=['GET', 'POST'])
 def submit_report():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    user = User.query.get(session['user_id'))
+    user = User.query.get(session['user_id'])
     if not check_permission(user, 'user'):
         return redirect(url_for('dashboard'))
 
@@ -410,7 +551,6 @@ def submit_report():
                 return render_template('submit_report.html', form=form, item_forms=item_forms, commodities=commodities, user=user)
 
             report_date = form.report_date.data
-            # Enforce weekly reports
             report = Report(facility_id=facility_id, user_id=user.id, report_date=report_date, report_period='weekly')
             db.session.add(report)
             db.session.flush()
@@ -644,48 +784,46 @@ def analytics():
 
     labels = [r.report.report_date.strftime('%Y-%m-%d') for r in reports] if reports else [datetime.utcnow().strftime('%Y-%m-%d')]
     data = [int(r.closing_balance) for r in reports] if reports else [0]
-
-    ```chartjs
-    {
-        "type": "line",
-        "data": {
-            "labels": labels,
-            "datasets": [{
-                "label": commodity.name + " Closing Balance",
-                "data": data,
-                "borderColor": "#3B82F6",
-                "backgroundColor": "rgba(59, 130, 246, 0.1)",
-                "fill": true,
-                "tension": 0.4
+    chart_data = {
+        'type': 'line',
+        'data': {
+            'labels': labels,
+            'datasets': [{
+                'label': commodity.name + ' Closing Balance',
+                'data': data,
+                'borderColor': '#3B82F6',
+                'backgroundColor': 'rgba(59, 130, 246, 0.1)',
+                'fill': True,
+                'tension': 0.4
             }]
         },
-        "options": {
-            "responsive": true,
-            "scales": {
-                "y": {
-                    "beginAtZero": true,
-                    "title": {"display": true, "text": "Closing Balance"}
+        'options': {
+            'responsive': True,
+            'scales': {
+                'y': {
+                    'beginAtZero': True,
+                    'title': {'display': True, 'text': 'Closing Balance'}
                 },
-                "x": {
-                    "title": {"display": true, "text": "Report Date"}
+                'x': {
+                    'title': {'display': True, 'text': 'Report Date'}
                 }
             },
-            "plugins": {
-                "legend": {"position": "top"},
-                "title": {"display": true, "text": commodity.name + " Inventory Trend (" + period.capitalize() + ")"}
+            'plugins': {
+                'legend': {'position': 'top'},
+                'title': {'display': True, 'text': commodity.name + ' Inventory Trend (' + period.capitalize() + ')'}
             }
         }
     }
-    ```
 
     try:
-        chart_data_json = json.dumps({"labels": labels, "data": data, "commodity_name": commodity.name, "period": period}, ensure_ascii=False)
+        chart_data_json = json.dumps(chart_data, ensure_ascii=False)
     except (TypeError, ValueError) as e:
         logger.error(f"Failed to serialize chart_data: {str(e)}")
         flash('Error generating analytics chart.', 'danger')
         chart_data_json = json.dumps({
-            "labels": [], "data": [], "commodity_name": "No Data", "period": period,
-            "options": {"plugins": {"title": {"display": true, "text": "No Data Available"}}}
+            'type': 'line',
+            'data': {'labels': [], 'datasets': []},
+            'options': {'plugins': {'title': {'display': True, 'text': 'No Data Available'}}}
         })
 
     facilities = Facility.query.all() if user.role == 'admin' else [user.facility]
