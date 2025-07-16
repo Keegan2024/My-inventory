@@ -1,9 +1,0 @@
-[phases.setup]
-nixPkgs = ['python3.10', 'libpq', 'gcc', 'pkg-config', 'cairo']
-nixpkgsArchive = '23.11'
-
-[phases.build]
-cmds = ['pip install --no-cache-dir -r requirements.txt']
-
-[start]
-cmd = 'gunicorn --bind 0.0.0.0:$PORT app:app'
