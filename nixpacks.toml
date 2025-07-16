@@ -1,2 +1,5 @@
 [phases.setup]
 nixPkgs = ["cairo", "gcc", "pkg-config", "postgresql_16", "python39"]
+
+[start]
+cmd = "gunicorn app:app --bind 0.0.0.0:$PORT"
