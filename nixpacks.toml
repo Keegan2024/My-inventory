@@ -1,3 +1,1 @@
-
-[phases.build]
-nixPkgs = ["pkg-config", "cairo"]
+postgresql_16
