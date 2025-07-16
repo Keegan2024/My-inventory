@@ -2,7 +2,7 @@ import os
 import io
 import csv
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, session, make_response, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -17,6 +17,7 @@ import pandas as pd
 import openpyxl
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 import logging
+from sqlalchemy import func
 
 app = Flask(__name__)
 
@@ -87,7 +88,7 @@ class Report(db.Model):
     facility_id = db.Column(db.Integer, db.ForeignKey('facility.id'), nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     report_date = db.Column(db.Date, nullable=False, index=True)
-    report_period = db.Column(db.String(20), nullable=False)
+    report_period = db.Column(db.String(20), nullable=False, default='weekly')
     submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
     items = db.relationship('ReportItem', backref='report', lazy=True, cascade='all, delete-orphan')
 
@@ -121,7 +122,6 @@ class ReportForm(FlaskForm):
     district_id = SelectField('District', coerce=int, validators=[DataRequired()])
     facility_id = SelectField('Facility', coerce=int, validators=[DataRequired()])
     report_date = DateField('Report Date', validators=[DataRequired()], format='%Y-%m-%d')
-    report_period = SelectField('Report Period', choices=[('weekly', 'Weekly'), ('monthly', 'Monthly')], validators=[DataRequired()])
     commodity_id = SelectField('Commodity', coerce=int, validators=[DataRequired()])
     submit = SubmitField('Submit Report')
 
@@ -388,7 +388,7 @@ def dashboard():
 def submit_report():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    user = User.query.get(session['user_id'])
+    user = User.query.get(session['user_id'))
     if not check_permission(user, 'user'):
         return redirect(url_for('dashboard'))
 
@@ -410,7 +410,10 @@ def submit_report():
                 return render_template('submit_report.html', form=form, item_forms=item_forms, commodities=commodities, user=user)
 
             report_date = form.report_date.data
-            report_period = form.report_period.data
+            # Enforce weekly reports
+            report = Report(facility_id=facility_id, user_id=user.id, report_date=report_date, report_period='weekly')
+            db.session.add(report)
+            db.session.flush()
 
             items = [
                 {
@@ -429,10 +432,6 @@ def submit_report():
                 for err in errors:
                     flash(err, 'danger')
                 return render_template('submit_report.html', form=form, item_forms=item_forms, commodities=commodities, user=user)
-
-            report = Report(facility_id=facility_id, user_id=user.id, report_date=report_date, report_period=report_period)
-            db.session.add(report)
-            db.session.flush()
 
             for item in items:
                 db.session.add(ReportItem(
@@ -538,7 +537,7 @@ def add_facility():
 
     return render_template('add_facility.html', form=form, user=user)
 
-@app.route('/view-reports')
+@app.route('/view-reports', methods=['GET'])
 def view_reports():
     if 'user_id' not in session:
         return redirect(url_for('login'))
@@ -548,16 +547,45 @@ def view_reports():
 
     page = request.args.get('page', 1, type=int)
     facility_id = request.args.get('facility_id', type=int)
-    reports = Report.query
-    if facility_id and user.role == 'admin':
-        reports = reports.filter_by(facility_id=facility_id)
-    elif user.role != 'admin':
-        reports = reports.filter_by(facility_id=user.facility_id)
-    reports = reports.order_by(Report.report_date.desc()).paginate(page=page, per_page=10)
-    facilities = Facility.query.all() if user.role == 'admin' else [user.facility]
-    return render_template('view_reports.html', reports=reports, user=user, facilities=facilities)
+    period = request.args.get('period', 'weekly')
+    start_date = request.args.get('start_date', type=str)
+    end_date = request.args.get('end_date', type=str)
 
-@app.route('/analytics')
+    reports_query = Report.query
+    if facility_id and user.role == 'admin':
+        reports_query = reports_query.filter_by(facility_id=facility_id)
+    elif user.role != 'admin':
+        reports_query = reports_query.filter_by(facility_id=user.facility_id)
+
+    if period == 'daily':
+        if start_date:
+            try:
+                start = datetime.strptime(start_date, '%Y-%m-%d').date()
+                reports_query = reports_query.filter(Report.report_date == start)
+            except ValueError:
+                flash('Invalid start date format.', 'danger')
+    elif period == 'weekly':
+        if start_date and end_date:
+            try:
+                start = datetime.strptime(start_date, '%Y-%m-%d').date()
+                end = datetime.strptime(end_date, '%Y-%m-%d').date()
+                reports_query = reports_query.filter(Report.report_date.between(start, end))
+            except ValueError:
+                flash('Invalid date format.', 'danger')
+    elif period == 'quarterly':
+        if start_date and end_date:
+            try:
+                start = datetime.strptime(start_date, '%Y-%m-%d').date()
+                end = datetime.strptime(end_date, '%Y-%m-%d').date()
+                reports_query = reports_query.filter(Report.report_date.between(start, end))
+            except ValueError:
+                flash('Invalid date format.', 'danger')
+
+    reports = reports_query.order_by(Report.report_date.desc()).paginate(page=page, per_page=10)
+    facilities = Facility.query.all() if user.role == 'admin' else [user.facility]
+    return render_template('view_reports.html', reports=reports, user=user, facilities=facilities, period=period, start_date=start_date, end_date=end_date)
+
+@app.route('/analytics', methods=['GET'])
 def analytics():
     if 'user_id' not in session:
         return redirect(url_for('login'))
@@ -567,6 +595,9 @@ def analytics():
 
     commodity_id = request.args.get('commodity_id', type=int)
     facility_id = request.args.get('facility_id', type=int) if user.role == 'admin' else user.facility_id
+    period = request.args.get('period', 'weekly')
+    start_date = request.args.get('start_date', type=str)
+    end_date = request.args.get('end_date', type=str)
 
     if not commodity_id:
         commodity = Commodity.query.first()
@@ -580,57 +611,85 @@ def analytics():
         flash('Selected commodity not found.', 'warning')
         return redirect(url_for('dashboard'))
 
-    reports = ReportItem.query.join(Report).filter(
+    reports_query = ReportItem.query.join(Report).filter(
         ReportItem.commodity_id == commodity_id,
         Report.facility_id == (facility_id or user.facility_id)
-    ).order_by(Report.report_date.asc()).all()
+    )
+
+    if period == 'daily':
+        if start_date:
+            try:
+                start = datetime.strptime(start_date, '%Y-%m-%d').date()
+                reports_query = reports_query.filter(Report.report_date == start)
+            except ValueError:
+                flash('Invalid start date format.', 'danger')
+    elif period == 'weekly':
+        if start_date and end_date:
+            try:
+                start = datetime.strptime(start_date, '%Y-%m-%d').date()
+                end = datetime.strptime(end_date, '%Y-%m-%d').date()
+                reports_query = reports_query.filter(Report.report_date.between(start, end))
+            except ValueError:
+                flash('Invalid date format.', 'danger')
+    elif period == 'quarterly':
+        if start_date and end_date:
+            try:
+                start = datetime.strptime(start_date, '%Y-%m-%d').date()
+                end = datetime.strptime(end_date, '%Y-%m-%d').date()
+                reports_query = reports_query.filter(Report.report_date.between(start, end))
+            except ValueError:
+                flash('Invalid date format.', 'danger')
+
+    reports = reports_query.order_by(Report.report_date.asc()).all()
 
     labels = [r.report.report_date.strftime('%Y-%m-%d') for r in reports] if reports else [datetime.utcnow().strftime('%Y-%m-%d')]
     data = [int(r.closing_balance) for r in reports] if reports else [0]
-    chart_data = {
-        'type': 'line',
-        'data': {
-            'labels': labels,
-            'datasets': [{
-                'label': commodity.name + ' Closing Balance',
-                'data': data,
-                'borderColor': '#3B82F6',
-                'backgroundColor': 'rgba(59, 130, 246, 0.1)',
-                'fill': True,
-                'tension': 0.4
+
+    ```chartjs
+    {
+        "type": "line",
+        "data": {
+            "labels": labels,
+            "datasets": [{
+                "label": commodity.name + " Closing Balance",
+                "data": data,
+                "borderColor": "#3B82F6",
+                "backgroundColor": "rgba(59, 130, 246, 0.1)",
+                "fill": true,
+                "tension": 0.4
             }]
         },
-        'options': {
-            'responsive': True,
-            'scales': {
-                'y': {
-                    'beginAtZero': True,
-                    'title': {'display': True, 'text': 'Closing Balance'}
+        "options": {
+            "responsive": true,
+            "scales": {
+                "y": {
+                    "beginAtZero": true,
+                    "title": {"display": true, "text": "Closing Balance"}
                 },
-                'x': {
-                    'title': {'display': True, 'text': 'Report Date'}
+                "x": {
+                    "title": {"display": true, "text": "Report Date"}
                 }
             },
-            'plugins': {
-                'legend': {'position': 'top'},
-                'title': {'display': True, 'text': commodity.name + ' Inventory Trend'}
+            "plugins": {
+                "legend": {"position": "top"},
+                "title": {"display": true, "text": commodity.name + " Inventory Trend (" + period.capitalize() + ")"}
             }
         }
     }
+    ```
 
     try:
-        chart_data_json = json.dumps(chart_data, ensure_ascii=False)
+        chart_data_json = json.dumps({"labels": labels, "data": data, "commodity_name": commodity.name, "period": period}, ensure_ascii=False)
     except (TypeError, ValueError) as e:
         logger.error(f"Failed to serialize chart_data: {str(e)}")
         flash('Error generating analytics chart.', 'danger')
         chart_data_json = json.dumps({
-            'type': 'line',
-            'data': {'labels': [], 'datasets': []},
-            'options': {'plugins': {'title': {'display': True, 'text': 'No Data Available'}}}
+            "labels": [], "data": [], "commodity_name": "No Data", "period": period,
+            "options": {"plugins": {"title": {"display": true, "text": "No Data Available"}}}
         })
 
     facilities = Facility.query.all() if user.role == 'admin' else [user.facility]
-    return render_template('analytics.html', chart_data=chart_data_json, commodities=Commodity.query.all(), selected_commodity=commodity, user=user, facilities=facilities)
+    return render_template('analytics.html', chart_data=chart_data_json, commodities=Commodity.query.all(), selected_commodity=commodity, user=user, facilities=facilities, period=period, start_date=start_date, end_date=end_date)
 
 @app.route('/export-reports', methods=['GET'])
 def export_reports():
@@ -641,12 +700,41 @@ def export_reports():
         return redirect(url_for('dashboard'))
 
     facility_id = request.args.get('facility_id', type=int)
-    reports = Report.query
+    period = request.args.get('period', 'weekly')
+    start_date = request.args.get('start_date', type=str)
+    end_date = request.args.get('end_date', type=str)
+
+    reports_query = Report.query
     if facility_id and user.role == 'admin':
-        reports = reports.filter_by(facility_id=facility_id)
+        reports_query = reports_query.filter_by(facility_id=facility_id)
     elif user.role != 'admin':
-        reports = reports.filter_by(facility_id=user.facility_id)
-    reports = reports.all()
+        reports_query = reports_query.filter_by(facility_id=user.facility_id)
+
+    if period == 'daily':
+        if start_date:
+            try:
+                start = datetime.strptime(start_date, '%Y-%m-%d').date()
+                reports_query = reports_query.filter(Report.report_date == start)
+            except ValueError:
+                flash('Invalid start date format.', 'danger')
+    elif period == 'weekly':
+        if start_date and end_date:
+            try:
+                start = datetime.strptime(start_date, '%Y-%m-%d').date()
+                end = datetime.strptime(end_date, '%Y-%m-%d').date()
+                reports_query = reports_query.filter(Report.report_date.between(start, end))
+            except ValueError:
+                flash('Invalid date format.', 'danger')
+    elif period == 'quarterly':
+        if start_date and end_date:
+            try:
+                start = datetime.strptime(start_date, '%Y-%m-%d').date()
+                end = datetime.strptime(end_date, '%Y-%m-%d').date()
+                reports_query = reports_query.filter(Report.report_date.between(start, end))
+            except ValueError:
+                flash('Invalid date format.', 'danger')
+
+    reports = reports_query.all()
 
     output = io.StringIO()
     writer = csv.writer(output)
