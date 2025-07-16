@@ -1,0 +1,2 @@
+[phases.build]
+nixPkgs = ["pkg-config", "cairo", "gcc", "postgresql_16", "python39"]
