@@ -380,18 +380,25 @@ def analytics():
         commodity_id = commodity.id
 
     commodity = Commodity.query.get(commodity_id)
+    if not commodity:
+        flash('Selected commodity not found.', 'warning')
+        return redirect(url_for('dashboard'))
+
     reports = ReportItem.query.join(Report).filter(
         ReportItem.commodity_id == commodity_id,
         Report.facility_id == user.facility_id
     ).order_by(Report.report_date.asc()).all()
 
+    # Ensure valid data for Chart.js
+    labels = [r.report.report_date.strftime('%Y-%m-%d') for r in reports] if reports else [datetime.utcnow().strftime('%Y-%m-%d')]
+    data = [int(r.closing_balance) for r in reports] if reports else [0]
     chart_data = {
         'type': 'line',
         'data': {
-            'labels': [r.report.report_date.strftime('%Y-%m-%d') for r in reports],
+            'labels': labels,
             'datasets': [{
-                'label': f'{commodity.name} Closing Balance',
-                'data': [r.closing_balance for r in reports],
+                'label': commodity.name + ' Closing Balance',
+                'data': data,
                 'borderColor': '#007bff',
                 'backgroundColor': 'rgba(0, 123, 255, 0.1)',
                 'fill': True,
@@ -411,11 +418,23 @@ def analytics():
             },
             'plugins': {
                 'legend': {'position': 'top'},
-                'title': {'display': True, 'text': f'{commodity.name} Inventory Trend'}
+                'title': {'display': True, 'text': commodity.name + ' Inventory Trend'}
             }
         }
     }
-    return render_template('analytics.html', chart_data=json.dumps(chart_data), commodities=Commodity.query.all(), selected_commodity=commodity, user=user)
+
+    try:
+        chart_data_json = json.dumps(chart_data, ensure_ascii=False)
+    except (TypeError, ValueError) as e:
+        logger.error(f"Failed to serialize chart_data: {str(e)}")
+        flash('Error generating analytics chart.', 'danger')
+        chart_data_json = json.dumps({
+            'type': 'line',
+            'data': {'labels': [], 'datasets': []},
+            'options': {'plugins': {'title': {'display': True, 'text': 'No Data Available'}}}
+        })
+
+    return render_template('analytics.html', chart_data=chart_data_json, commodities=Commodity.query.all(), selected_commodity=commodity, user=user)
 
 @app.route('/export-reports', methods=['GET'])
 def export_reports():
@@ -512,4 +531,3 @@ def shutdown_session(exception=None):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=os.environ.get('FLASK_ENV', 'development') == 'development')
-```
