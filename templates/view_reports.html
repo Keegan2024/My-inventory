@@ -1,23 +1,87 @@
 {% extends "base.html" %}
-{% block title %}View Reports{% endblock %}
 {% block content %}
-<h2>All Reports</h2>
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th>ID</th><th>Facility</th><th>Date</th><th>Period</th><th>User</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for report in reports.items %}
-      <tr>
-        <td>{{ report.id }}</td>
-        <td>{{ report.facility.name }}</td>
-        <td>{{ report.report_date }}</td>
-        <td>{{ report.report_period }}</td>
-        <td>{{ report.user.username }}</td>
-      </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="bg-white p-6 rounded-lg shadow-md">
+    <h2 class="text-2xl font-bold mb-4">View Reports</h2>
+    <form method="GET" class="mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {% if user.role == 'admin' %}
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Facility</label>
+                    <select name="facility_id" class="mt-1 block w-full border border-gray-300 rounded-md p-2">
+                        <option value="">All Facilities</option>
+                        {% for facility in facilities %}
+                            <option value="{{ facility.id }}" {% if facility_id == facility.id %}selected{% endif %}>{{ facility.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Period</label>
+                <select name="period" class="mt-1 block w-full border border-gray-300 rounded-md p-2">
+                    <option value="daily" {% if period == 'daily' %}selected{% endif %}>Daily</option>
+                    <option value="weekly" {% if period == 'weekly' %}selected{% endif %}>Weekly</option>
+                    <option value="quarterly" {% if period == 'quarterly' %}selected{% endif %}>Quarterly</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Start Date</label>
+                <input type="date" name="start_date" value="{{ start_date or '' }}" class="mt-1 block w-full border border-gray-300 rounded-md p-2">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">End Date</label>
+                <input type="date" name="end_date" value="{{ end_date or '' }}" class="mt-1 block w-full border border-gray-300 rounded-md p-2">
+            </div>
+        </div>
+        <button type="submit" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Filter Reports</button>
+        <a href="{{ url_for('export_reports', facility_id=facility_id, period=period, start_date=start_date, end_date=end_date) }}" class="mt-4 ml-2 inline-block bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Export to CSV</a>
+    </form>
+    <div class="overflow-x-auto">
+        <table class="min-w-full bg-white border">
+            <thead>
+                <tr class="bg-gray-100">
+                    <th class="px-4 py-2 border">Report ID</th>
+                    <th class="px-4 py-2 border">Facility</th>
+                    <th class="px-4 py-2 border">Report Date</th>
+                    <th class="px-4 py-2 border">Commodity</th>
+                    <th class="px-4 py-2 border">Opening Balance</th>
+                    <th class="px-4 py-2 border">Received</th>
+                    <th class="px-4 py-2 border">Used</th>
+                    <th class="px-4 py-2 border">Closing Balance</th>
+                    <th class="px-4 py-2 border">Expiration Date</th>
+                    <th class="px-4 py-2 border">Remarks</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for report in reports.items %}
+                    {% for item in report.items %}
+                        <tr>
+                            <td class="px-4 py-2 border">{{ report.id }}</td>
+                            <td class="px-4 py-2 border">{{ report.facility.name }}</td>
+                            <td class="px-4 py-2 border">{{ report.report_date }}</td>
+                            <td class="px-4 py-2 border">{{ item.commodity.name }}</td>
+                            <td class="px-4 py-2 border">{{ item.opening_balance }}</td>
+                            <td class="px-4 py-2 border">{{ item.received }}</td>
+                            <td class="px-4 py-2 border">{{ item.used }}</td>
+                            <td class="px-4 py-2 border">{{ item.closing_balance }}</td>
+                            <td class="px-4 py-2 border">{{ item.exp_date or '' }}</td>
+                            <td class="px-4 py-2 border">{{ item.remarks or '' }}</td>
+                        </tr>
+                    {% endfor %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if reports.has_prev or reports.has_next %}
+        <div class="mt-4 flex justify-between">
+            {% if reports.has_prev %}
+                <a href="{{ url_for('view_reports', page=reports.prev_num, facility_id=facility_id, period=period, start_date=start_date, end_date=end_date) }}" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Previous</a>
+            {% else %}
+                <span></span>
+            {% endif %}
+            {% if reports.has_next %}
+                <a href="{{ url_for('view_reports', page=reports.next_num, facility_id=facility_id, period=period, start_date=start_date, end_date=end_date) }}" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Next</a>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
 {% endblock %}
