@@ -1,1 +1,3 @@
-postgresql_16
+
+[phases.setup]
+nixPkgs = ["cairo", "gcc", "pkg-config", "postgresql_16", "python39"]
