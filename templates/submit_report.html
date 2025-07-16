@@ -1,31 +1,123 @@
 {% extends "base.html" %}
-{% block title %}Submit Report{% endblock %}
 {% block content %}
-<h2>Submit Report</h2>
-<form method="POST">
-  {{ form.hidden_tag() }}
-  <div class="mb-3">
-    {{ form.report_date.label }} {{ form.report_date(class="form-control") }}
-  </div>
-  <div class="mb-3">
-    {{ form.report_period.label }} {{ form.report_period(class="form-control") }}
-  </div>
-
-  {% for cid, item_form in item_forms.items() %}
-    <fieldset class="border p-3 mb-3">
-      <legend>{{ commodities|selectattr("id", "equalto", cid)|first.name }}</legend>
-      {{ item_form.hidden_tag() }}
-      <div class="row">
-        <div class="col">{{ item_form.opening_balance.label }} {{ item_form.opening_balance(class="form-control") }}</div>
-        <div class="col">{{ item_form.received.label }} {{ item_form.received(class="form-control") }}</div>
-        <div class="col">{{ item_form.used.label }} {{ item_form.used(class="form-control") }}</div>
-        <div class="col">{{ item_form.closing_balance.label }} {{ item_form.closing_balance(class="form-control") }}</div>
-      </div>
-      <div class="mt-2">{{ item_form.exp_date.label }} {{ item_form.exp_date(class="form-control") }}</div>
-      <div class="mt-2">{{ item_form.remarks.label }} {{ item_form.remarks(class="form-control") }}</div>
-    </fieldset>
-  {% endfor %}
-
-  <button type="submit" class="btn btn-success">Submit</button>
-</form>
+<div class="bg-white p-6 rounded-lg shadow-md">
+    <h2 class="text-2xl font-bold mb-4">Submit Report</h2>
+    <form method="POST" class="space-y-4">
+        {{ form.hidden_tag() }}
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Province</label>
+                {{ form.province_id(class="mt-1 block w-full border border-gray-300 rounded-md p-2", onchange="updateHubs(this.value)") }}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Hub</label>
+                {{ form.hub_id(class="mt-1 block w-full border border-gray-300 rounded-md p-2", onchange="updateDistricts(this.value)") }}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">District</label>
+                {{ form.district_id(class="mt-1 block w-full border border-gray-300 rounded-md p-2", onchange="updateFacilities(this.value)") }}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Facility</label>
+                {{ form.facility_id(class="mt-1 block w-full border border-gray-300 rounded-md p-2") }}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Report Date</label>
+                {{ form.report_date(class="mt-1 block w-full border border-gray-300 rounded-md p-2") }}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Report Period</label>
+                {{ form.report_period(class="mt-1 block w-full border border-gray-300 rounded-md p-2") }}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Commodity</label>
+                {{ form.commodity_id(class="mt-1 block w-full border border-gray-300 rounded-md p-2") }}
+            </div>
+        </div>
+        <div class="overflow-x-auto mt-4">
+            <table class="min-w-full bg-white border">
+                <thead>
+                    <tr class="bg-gray-100">
+                        <th class="px-4 py-2 border">Commodity</th>
+                        <th class="px-4 py-2 border">Opening Balance</th>
+                        <th class="px-4 py-2 border">Received</th>
+                        <th class="px-4 py-2 border">Used</th>
+                        <th class="px-4 py-2 border">Closing Balance</th>
+                        <th class="px-4 py-2 border">Expiration Date</th>
+                        <th class="px-4 py-2 border">Remarks</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for commodity in commodities %}
+                        {% set form = item_forms[commodity.id] %}
+                        {{ form.hidden_tag() }}
+                        <tr>
+                            <td class="px-4 py-2 border">{{ commodity.name }}</td>
+                            <td class="px-4 py-2 border">
+                                {{ form.opening_balance(class="w-full border rounded-md p-1", **{'value': form_data['opening_balance_' + str(commodity.id)]}) }}
+                            </td>
+                            <td class="px-4 py-2 border">{{ form.received(class="w-full border rounded-md p-1") }}</td>
+                            <td class="px-4 py-2 border">{{ form.used(class="w-full border rounded-md p-1") }}</td>
+                            <td class="px-4 py-2 border">{{ form.closing_balance(class="w-full border rounded-md p-1") }}</td>
+                            <td class="px-4 py-2 border">{{ form.exp_date(class="w-full border rounded-md p-1") }}</td>
+                            <td class="px-4 py-2 border">{{ form.remarks(class="w-full border rounded-md p-1") }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <button type="submit" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Submit Report</button>
+    </form>
+</div>
+<script>
+    function updateHubs(provinceId) {
+        $.get('/get_hubs/' + provinceId, function(data) {
+            let hubSelect = $('#hub_id');
+            hubSelect.empty();
+            hubSelect.append('<option value="">Select Hub</option>');
+            data.forEach(function(hub) {
+                hubSelect.append('<option value="' + hub.id + '">' + hub.name + '</option>');
+            });
+            updateDistricts('');
+        });
+    }
+    function updateDistricts(hubId) {
+        if (hubId) {
+            $.get('/get_districts/' + hubId, function(data) {
+                let districtSelect = $('#district_id');
+                districtSelect.empty();
+                districtSelect.append('<option value="">Select District</option>');
+                data.forEach(function(district) {
+                    districtSelect.append('<option value="' + district.id + '">' + district.name + '</option>');
+                });
+                updateFacilities('');
+            });
+        } else {
+            $('#district_id').empty().append('<option value="">Select District</option>');
+            $('#facility_id').empty().append('<option value="">Select Facility</option>');
+        }
+    }
+    function updateFacilities(districtId) {
+        if (districtId) {
+            $.get('/get_facilities/' + districtId, function(data) {
+                let facilitySelect = $('#facility_id');
+                facilitySelect.empty();
+                facilitySelect.append('<option value="">Select Facility</option>');
+                data.forEach(function(facility) {
+                    facilitySelect.append('<option value="' + facility.id + '">' + facility.name + '</option>');
+                });
+            });
+        } else {
+            $('#facility_id').empty().append('<option value="">Select Facility</option>');
+        }
+    }
+    $(document).ready(function() {
+        {% if user.role != 'admin' %}
+            $('#province_id').prop('disabled', true);
+            $('#hub_id').prop('disabled', true);
+            $('#district_id').prop('disabled', true);
+            $('#facility_id').prop('disabled', true);
+        {% endif %}
+    });
+</script>
 {% endblock %}
