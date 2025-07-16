@@ -1,36 +1,22 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+</head>
+<body>
+    <h2>Welcome, {{ user.username }}</h2>
+    <a href="{{ url_for('submit_report') }}">Submit Report</a> |
+    <a href="{{ url_for('logout') }}">Logout</a>
 
-{% block content %}
-<div class="content">
-    <h2>Welcome, {{ user.username }} ({{ user.facility }})</h2>
-    
-    <div class="dashboard-actions">
-        <a href="{{ url_for('submit_report') }}" class="btn btn-primary">Submit Weekly Report</a>
-        <a href="{{ url_for('view_reports') }}" class="btn btn-secondary">View Previous Reports</a>
-    </div>
-    
     <h3>Recent Reports</h3>
     {% if reports %}
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Week</th>
-                    <th>Date</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for report in reports %}
-                    <tr>
-                        <td>Week {{ report.week_number }}</td>
-                        <td>{{ report.report_date.strftime('%Y-%m-%d') }}</td>
-                        <td><a href="{{ url_for('view_reports') }}?week={{ report.week_number }}">View</a></td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <ul>
+        {% for report in reports %}
+            <li>{{ report.report_date }} — {{ report.report_period }}</li>
+        {% endfor %}
+        </ul>
     {% else %}
-        <p>No reports submitted yet.</p>
+        <p>No reports found.</p>
     {% endif %}
-</div>
-{% endblock %}
+</body>
+</html>
