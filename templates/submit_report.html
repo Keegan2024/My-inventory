@@ -1,107 +1,52 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Submit Report</title>
+</head>
+<body>
+    <h2>Submit Report — {{ user.facility.name }}</h2>
+    <a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <p style="color:red;">{{ message }}</p>
+        {% endfor %}
+    {% endwith %}
 
-{% block content %}
-<div class="content">
-    <h2>Submit Supply Chain Report</h2>
-    
-    <form method="POST" id="reportForm">
-        <div class="form-section">
-            <div class="form-group">
-                <label>Facility</label>
-                <input type="text" value="{{ user.facility.name }}" readonly class="form-control">
-            </div>
-            <div class="form-group">
-                <label>Report Date*</label>
-                <input type="date" name="report_date" required class="form-control" 
-                       value="{{ form_data.report_date if form_data.report_date else '' }}">
-            </div>
-            <div class="form-group">
-                <label>Reporting Period*</label>
-                <select name="report_period" required class="form-control">
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="quarterly">Quarterly</option>
-                </select>
-            </div>
-        </div>
+    <form method="post">
+        <label>Report Date:</label>
+        <input type="date" name="report_date" required><br><br>
 
-        <div class="form-section">
-            <h3>Commodity Tracking</h3>
-            <table class="table" id="commodityTable">
-                <thead>
-                    <tr>
-                        <th>Commodity</th>
-                        <th>Opening Balance</th>
-                        <th>Received</th>
-                        <th>Used</th>
-                        <th>Closing Balance</th>
-                        <th>Expiry Date</th>
-                        <th>Remarks</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for commodity in commodities %}
-                    <tr>
-                        <td>{{ commodity.name }}</td>
-                        <td>
-                            <input type="number" name="opening_balance_{{ commodity.id }}" 
-                                   value="{{ form_data['opening_balance_' ~ commodity.id] if 'opening_balance_' ~ commodity.id in form_data else '' }}" 
-                                   min="0" class="form-control opening-balance" required>
-                        </td>
-                        <td>
-                            <input type="number" name="received_{{ commodity.id }}" 
-                                   value="{{ form_data['received_' ~ commodity.id] if 'received_' ~ commodity.id in form_data else '0' }}" 
-                                   min="0" class="form-control received" required>
-                        </td>
-                        <td>
-                            <input type="number" name="used_{{ commodity.id }}" 
-                                   value="{{ form_data['used_' ~ commodity.id] if 'used_' ~ commodity.id in form_data else '0' }}" 
-                                   min="0" class="form-control used" required>
-                        </td>
-                        <td>
-                            <input type="number" name="closing_balance_{{ commodity.id }}" 
-                                   value="{{ form_data['closing_balance_' ~ commodity.id] if 'closing_balance_' ~ commodity.id in form_data else '' }}" 
-                                   min="0" class="form-control closing-balance" readonly required>
-                        </td>
-                        <td>
-                            <input type="text" name="exp_date_{{ commodity.id }}" 
-                                   value="{{ form_data['exp_date_' ~ commodity.id] if 'exp_date_' ~ commodity.id in form_data else '' }}" 
-                                   placeholder="DD/MM/YYYY" class="form-control">
-                        </td>
-                        <td>
-                            <input type="text" name="remarks_{{ commodity.id }}" 
-                                   value="{{ form_data['remarks_' ~ commodity.id] if 'remarks_' ~ commodity.id in form_data else '' }}" 
-                                   class="form-control">
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        <label>Period:</label>
+        <select name="report_period">
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="quarterly">Quarterly</option>
+        </select><br><br>
 
-        <button type="submit" class="btn-submit">Submit Report</button>
+        <table border="1" cellpadding="5">
+            <tr>
+                <th>Commodity</th>
+                <th>Opening Balance</th>
+                <th>Received</th>
+                <th>Used</th>
+                <th>Closing Balance</th>
+                <th>Expiry Date</th>
+                <th>Remarks</th>
+            </tr>
+            {% for commodity in commodities %}
+            <tr>
+                <td>{{ commodity.name }}</td>
+                <td><input type="number" name="opening_balance_{{ commodity.id }}" value="{{ form_data['opening_balance_' + commodity.id|string] }}"></td>
+                <td><input type="number" name="received_{{ commodity.id }}" value="{{ form_data['received_' + commodity.id|string] }}"></td>
+                <td><input type="number" name="used_{{ commodity.id }}" value="{{ form_data['used_' + commodity.id|string] }}"></td>
+                <td><input type="number" name="closing_balance_{{ commodity.id }}" value="{{ form_data['closing_balance_' + commodity.id|string] }}"></td>
+                <td><input type="text" name="exp_date_{{ commodity.id }}" value="{{ form_data['exp_date_' + commodity.id|string] }}"></td>
+                <td><input type="text" name="remarks_{{ commodity.id }}" value="{{ form_data['remarks_' + commodity.id|string] }}"></td>
+            </tr>
+            {% endfor %}
+        </table><br>
+
+        <button type="submit">Submit Report</button>
     </form>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('reportForm');
-    
-    // Calculate closing balance when any of the values change
-    form.addEventListener('input', function(e) {
-        if (e.target.classList.contains('opening-balance') || 
-            e.target.classList.contains('received') || 
-            e.target.classList.contains('used')) {
-            
-            const row = e.target.closest('tr');
-            const opening = parseInt(row.querySelector('.opening-balance').value) || 0;
-            const received = parseInt(row.querySelector('.received').value) || 0;
-            const used = parseInt(row.querySelector('.used').value) || 0;
-            
-            const closing = opening + received - used;
-            row.querySelector('.closing-balance').value = closing >= 0 ? closing : 0;
-        }
-    });
-});
-</script>
-{% endblock %}
+</body>
+</html>
