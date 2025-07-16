@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Inventory</title></head>
+<body>
+  <nav>
+    <a href="{{ url_for('dashboard') }}">Dashboard</a> |
+    <a href="{{ url_for('submit_report') }}">Submit Report</a> |
+    <a href="{{ url_for('view_reports') }}">View Reports</a> |
+    <a href="{{ url_for('analytics') }}">Analytics</a> |
+    <a href="{{ url_for('import_reports') }}">Import</a> |
+    <a href="{{ url_for('export_reports') }}">Export</a> |
+    <a href="{{ url_for('logout') }}">Logout</a>
+  </nav><hr>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}<p style="color:red">{{ msg }}</p>{% endfor %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</body>
+</html>
