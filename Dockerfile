@@ -1,19 +1,19 @@
-FROM python:3.10-slim
+FROM python:3.9-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y \
-    gcc \
-    pkg-config \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+    build-essential libpq-dev git && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY . .
 
-ENV FLASK_ENV=production
-ENV PORT=8000
+EXPOSE 8080
 
-CMD ["sh", "-c", "flask db upgrade && gunicorn --bind 0.0.0.0:$PORT app:app"]
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8080"]
