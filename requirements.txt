@@ -1,10 +1,6 @@
-flask==2.3.2
-flask-sqlalchemy==3.0.5
-flask-wtf==1.2.1
-flask-caching==2.1.0
-flask-limiter==3.12
+Flask==2.3.3
+Flask-SQLAlchemy==3.1.1
+Flask-Login==0.6.3
 psycopg2-binary==2.9.9
-pandas==2.2.2
-reportlab==4.2.2
-gunicorn==22.0.0
-flask-migrate==4.0.7
+Werkzeug==2.3.7
+gunicorn==21.2.0
