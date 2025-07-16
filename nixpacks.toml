@@ -1,1 +1,3 @@
 
+[phases.build]
+nixPkgs = ["pkg-config", "cairo"]
