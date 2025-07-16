@@ -5,6 +5,14 @@ from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, session, make_response, send_file
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
+from flask_migrate import Migrate
+
+# ... other imports and app setup ...
+
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
+
+# ... rest of your app.py code ...
 from wtforms import StringField, PasswordField, DateField, SelectField, IntegerField, TextAreaField, SubmitField
 from wtforms.validators import DataRequired, Length, NumberRange
 from werkzeug.security import generate_password_hash, check_password_hash
