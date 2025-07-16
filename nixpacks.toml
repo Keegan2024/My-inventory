@@ -1,8 +1,8 @@
 [phases.setup]
-nixPkgs = ['python310', 'gunicorn']
+  nixPkgs = ['python310', 'postgresql_16', 'gcc', 'pkg-config', 'cairo']
 
 [phases.build]
-cmds = ['pip install --no-cache-dir -r requirements.txt']
+  cmds = ['pip install --no-cache-dir -r requirements.txt']
 
 [start]
-cmd = 'gunicorn --bind 0.0.0.0:$PORT app:app'
+  cmd = 'gunicorn --bind 0.0.0.0:$PORT app:app'
