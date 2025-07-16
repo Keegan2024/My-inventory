@@ -179,7 +179,7 @@ def login():
             return redirect(url_for('dashboard'))
         
         flash('Invalid credentials', 'danger')
-    return render_template('login.html'))
+    return render_template('login.html')
 
 @app.route('/dashboard')
 def dashboard():
@@ -188,7 +188,7 @@ def dashboard():
     
     user = User.query.get(session['user_id'])
     reports = Report.query.filter_by(facility_id=user.facility_id).order_by(Report.report_date.desc()).limit(5).all()
-    return render_template('dashboard.html', user=user, reports=reports))
+    return render_template('dashboard.html', user=user, reports=reports)
 
 @app.route('/submit-report', methods=['GET', 'POST'])
 def submit_report():
@@ -278,8 +278,6 @@ def submit_report():
             form_data[f'opening_balance_{commodity.id}'] = prev_report.closing_balance
     
     return render_template('submit_report.html', commodities=commodities, user=user, form_data=form_data)
-
-# Add other routes here...
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
