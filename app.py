@@ -32,7 +32,34 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['CACHE_TYPE'] = 'SimpleCache'
 app.config['CACHE_DEFAULT_TIMEOUT'] = 300
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-app.config['RATELIMIT_STORAGE_URL'] = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')  # Redis for Flask-Limiter
+
+# Handle Redis URL configuration for Flask-Limiter
+redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+if redis_url.startswith('redis-cli'):
+    # Extract password from redis-cli format and create proper URL
+    redis_password = redis_url.split('-u')[-1].strip()
+    redis_url = f"redis://:{redis_password}@redis-host:6379/0"  # Replace redis-host with your actual host if known
+app.config['RATELIMIT_STORAGE_URL'] = redis_url
+
+# Initialize extensions
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
+cache = Cache(app)
+
+# Initialize limiter with error handling
+try:
+    limiter = Limiter(
+        app=app,
+        key_func=get_remote_address,
+        storage_uri=app.config['RATELIMIT_STORAGE_URL']
+    )
+except Exception as e:
+    logger.error(f"Failed to initialize Redis limiter: {str(e)} - Falling back to memory storage")
+    limiter = Limiter(
+        app=app,
+        key_func=get_remote_address,
+        storage_uri="memory://"
+    )
 
 # Initialize extensions
 db = SQLAlchemy(app)
