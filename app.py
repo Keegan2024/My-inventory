@@ -500,6 +500,47 @@ def manage_users():
     users = User.query.all()
     return render_template('manage_users.html', users=users, user=user)
 
+@app.route('/view-reports', methods=['GET', 'POST'])
+def view_reports():
+    try:
+        if 'user_id' not in session:
+            logger.info("No user_id in session, redirecting to login")
+            return redirect(url_for('login'))
+        user = User.query.get(session['user_id'])
+        if not user:
+            logger.warning("User not found, clearing session")
+            session.clear()
+            flash('User not found. Please log in again.', 'warning')
+            return redirect(url_for('login'))
+
+        # Get filter parameters from request
+        facility_id = request.args.get('facility_id', type=int, default=user.facility_id)
+        start_date = request.args.get('start_date')
+        period = request.args.get('period', 'weekly')
+        page = request.args.get('page', 1, type=int)
+
+        # Restrict to user's facility unless admin
+        if user.role != 'admin' and facility_id != user.facility_id:
+            flash('You can only view reports for your assigned facility.', 'danger')
+            facility_id = user.facility_id
+
+        # Build query
+        query = Report.query.filter_by(facility_id=facility_id)
+        if start_date:
+            try:
+                query = query.filter(Report.report_date >= datetime.strptime(start_date, '%Y-%m-%d').date())
+            except ValueError:
+                flash('Invalid date format. Use YYYY-MM-DD.', 'danger')
+        if period:
+            query = query.filter_by(report_period=period)
+
+        reports = query.order_by(Report.report_date.desc()).paginate(page=page, per_page=10)
+        facilities = Facility.query.all() if user.role == 'admin' else [user.facility]
+        return render_template('view_reports.html', user=user, reports=reports, facilities=facilities, selected_facility_id=facility_id, start_date=start_date, period=period)
+    except Exception as e:
+        logger.error(f"View reports route error: {str(e)}", exc_info=True)
+        return "Internal Server Error", 500
+
 @app.route('/dashboard')
 def dashboard():
     if 'user_id' not in session:
