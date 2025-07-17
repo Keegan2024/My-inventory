@@ -19,7 +19,7 @@ import openpyxl
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 import logging
 
-# Initialize Flask app first
+# Initialize Flask app
 app = Flask(__name__)
 
 # Configure app
@@ -32,12 +32,13 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['CACHE_TYPE'] = 'SimpleCache'
 app.config['CACHE_DEFAULT_TIMEOUT'] = 300
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['RATELIMIT_STORAGE_URL'] = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')  # Redis for Flask-Limiter
 
-# Initialize extensions after app
+# Initialize extensions
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 cache = Cache(app)
-limiter = Limiter(get_remote_address, app=app)  # Initialize Limiter with app
+limiter = Limiter(get_remote_address, app=app, storage_uri=app.config['RATELIMIT_STORAGE_URL'])
 
 # Logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -182,7 +183,7 @@ class ImportForm(FlaskForm):
     file = FileField('Upload Excel File', validators=[DataRequired()])
     submit = SubmitField('Import')
 
-# Database Initialization (unchanged)
+# Database Initialization
 def initialize_database():
     with app.app_context():
         db.create_all()
@@ -251,9 +252,10 @@ def initialize_database():
                     phone_number='0972511451'
                 )
                 db.session.add(admin)
+                db.session.commit()  # Commit admin user to assign ID
                 db.session.add(AuditLog(user_id=admin.id, action='create_admin', details='Admin user created'))
                 db.session.commit()
-            except (SQLAlchemyError, ValueError) as e:
+            except SQLAlchemyError as e:
                 db.session.rollback()
                 logger.error(f"Admin creation failed: {str(e)}")
                 raise
@@ -386,7 +388,7 @@ def login():
                 flash('Your account is pending approval.', 'warning')
                 return render_template('login.html', form=form)
             session['user_id'] = user.id
-            session['user_role'] = user.role  # Store role in session
+            session['user_role'] = user.role
             db.session.add(AuditLog(user_id=user.id, action='login', details=f'User {username} logged in'))
             db.session.commit()
             flash('Login successful!', 'success')
@@ -688,6 +690,10 @@ def logout():
     session.clear()
     flash('Logged out successfully.', 'success')
     return redirect(url_for('login'))
+
+@app.route('/health')
+def health():
+    return jsonify({"status": "healthy"}), 200
 
 # Initialize database
 initialize_database()
