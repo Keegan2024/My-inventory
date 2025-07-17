@@ -38,7 +38,7 @@ app.config['RATELIMIT_STORAGE_URL'] = os.environ.get('REDIS_URL', 'redis://local
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 cache = Cache(app)
-limiter = Limiter(get_remote_address, app=app, storage_uri=app.config['RATELIMIT_STORAGE_URL'])
+limiter = Limiter(app, key_func=get_remote_address, storage_uri=app.config['RATELIMIT_STORAGE_URL'])
 
 # Logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
