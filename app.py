@@ -44,7 +44,7 @@ limiter = Limiter(get_remote_address, app=app, storage_uri=app.config['RATELIMIT
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Models (unchanged)
+# Models
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
@@ -116,7 +116,7 @@ class AuditLog(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     details = db.Column(db.Text)
 
-# Forms (unchanged)
+# Forms
 class LoginForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=3, max=80)])
     password = PasswordField('Password', validators=[DataRequired(), Length(min=6)])
@@ -293,7 +293,7 @@ def initialize_database():
                 logger.error(f"Commodity creation failed: {str(e)}")
                 raise
 
-# Helpers (unchanged)
+# Helpers
 @cache.memoize(timeout=300)
 def get_previous_report(facility_id, commodity_id):
     return ReportItem.query.join(Report).filter(
