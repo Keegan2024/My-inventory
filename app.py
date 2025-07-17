@@ -353,7 +353,7 @@ def parse_excel(file):
             data.append({
                 'commodity_id': commodity_map[item_desc],
                 'opening_balance': int(row[1]) if pd.notna(row[1]) else 0,
-                'received': int(row[2]) if pd.notna(row[2]) else 0,
+                'received': int(row[2]) if pd.notna(row[1]) else 0,
                 'used': int(row[3]) if pd.notna(row[3]) else 0,
                 'closing_balance': int(row[4]) if pd.notna(row[4]) else 0,
                 'exp_date': exp_date,
