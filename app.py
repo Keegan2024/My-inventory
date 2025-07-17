@@ -340,7 +340,7 @@ def check_permission(user, required_role):
     return True
 
 def parse_excel(file):
-    wb = openpyxl.load_workbook(file)
+    wb = openpyxl.load_workbook(file, read_only=True)  # Use read_only mode to reduce memory
     sheet = wb['WEEK 1']
     data = []
     commodities = Commodity.query.all()
@@ -359,6 +359,7 @@ def parse_excel(file):
                 'exp_date': exp_date,
                 'remarks': str(row[6]) if pd.notna(row[6]) else ''
             })
+    wb.close()  # Explicitly close to free memory
     return data
 
 def generate_reset_token():
