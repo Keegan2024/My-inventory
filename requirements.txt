@@ -1,6 +1,7 @@
 flask==2.0.1
-werkzeug==2.0.3  # Pinned to avoid url_quote import error
-flask-sqlalchemy==1.4.41  # Pinned to avoid __all__ error
+werkzeug==2.0.3
+flask-sqlalchemy==2.5.1
+SQLAlchemy==1.4.41
 psycopg2-binary==2.9.6
 flask-wtf==1.0.1
 flask-migrate==3.1.0
@@ -8,7 +9,7 @@ flask-caching==1.10.1
 flask-limiter==1.4
 openpyxl==3.0.10
 pandas==1.4.3
-numpy==1.23.5  # Pinned to avoid binary incompatibility with pandas
+numpy==1.23.5
 gunicorn==23.0.0
 redis==4.5.4
-# Force rebuild 2025-07-17-2
+# Force rebuild 2025-07-17-3
