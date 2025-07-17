@@ -14,6 +14,13 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_caching import Cache
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"]
+)
+
+limiter.init_app(app)  # Move the app init here
 import pandas as pd
 import openpyxl
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
