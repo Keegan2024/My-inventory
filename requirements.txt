@@ -11,3 +11,4 @@ pandas==1.4.3
 numpy==1.23.5  # Pinned to avoid binary incompatibility with pandas
 gunicorn==23.0.0
 redis==4.5.4
+# Force rebuild 2025-07-17-2
