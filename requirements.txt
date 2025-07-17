@@ -1,6 +1,6 @@
 flask==2.0.1
 werkzeug==2.0.3  # Pinned to avoid url_quote import error
-flask-sqlalchemy==2.5.1
+flask-sqlalchemy==2.5.1  # Pinned to fix __all__ error
 psycopg2-binary==2.9.6
 flask-wtf==1.0.1
 flask-migrate==3.1.0
