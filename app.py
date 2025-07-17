@@ -14,21 +14,15 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_caching import Cache
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"]
-)
-
-limiter.init_app(app)  # Move the app init here
 import pandas as pd
 import openpyxl
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 import logging
 
+# Initialize Flask app first
 app = Flask(__name__)
 
-# Secure configuration
+# Configure app
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secure-key-here')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///zambia_supply_chain.db').replace('postgres://', 'postgresql://')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -39,16 +33,17 @@ app.config['CACHE_TYPE'] = 'SimpleCache'
 app.config['CACHE_DEFAULT_TIMEOUT'] = 300
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
+# Initialize extensions after app
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
+cache = Cache(app)
+limiter = Limiter(get_remote_address, app=app)  # Initialize Limiter with app
+
 # Logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
-cache = Cache(app)
-limiter = Limiter(app, key_func=get_remote_address, default_limits=["200 per day", "50 per hour"])
-
-# Models
+# Models (unchanged)
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
@@ -56,8 +51,8 @@ class User(db.Model):
     facility_id = db.Column(db.Integer, db.ForeignKey('facility.id'), nullable=False)
     role = db.Column(db.String(20), nullable=False, default='user')  # user, admin, facility_manager, auditor
     approved = db.Column(db.Boolean, default=False)
-    phone_number = db.Column(db.String(20))  # For password reset
-    reset_token = db.Column(db.String(100), unique=True)
+    phone_number = db.Column(db.String(20))
+    reset_token = db.Column(db.String(100))
     reset_token_expiry = db.Column(db.DateTime)
     facility = db.relationship('Facility', backref='users')
     reports = db.relationship('Report', backref='user', lazy=True)
@@ -120,7 +115,7 @@ class AuditLog(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     details = db.Column(db.Text)
 
-# Forms
+# Forms (unchanged)
 class LoginForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=3, max=80)])
     password = PasswordField('Password', validators=[DataRequired(), Length(min=6)])
@@ -187,7 +182,7 @@ class ImportForm(FlaskForm):
     file = FileField('Upload Excel File', validators=[DataRequired()])
     submit = SubmitField('Import')
 
-# Database Initialization
+# Database Initialization (unchanged)
 def initialize_database():
     with app.app_context():
         db.create_all()
@@ -296,7 +291,7 @@ def initialize_database():
                 logger.error(f"Commodity creation failed: {str(e)}")
                 raise
 
-# Helpers
+# Helpers (unchanged)
 @cache.memoize(timeout=300)
 def get_previous_report(facility_id, commodity_id):
     return ReportItem.query.join(Report).filter(
@@ -342,9 +337,6 @@ def check_permission(user, required_role):
         return False
     return True
 
-def generate_reset_token():
-    return str(uuid.uuid4())
-
 def parse_excel(file):
     wb = openpyxl.load_workbook(file)
     sheet = wb['WEEK 1']
@@ -367,12 +359,20 @@ def parse_excel(file):
             })
     return data
 
+def generate_reset_token():
+    return str(uuid.uuid4())
+
 # Routes
 @app.route('/')
 def home():
-    if 'user_id' in session:
+    try:
+        if 'user_id' not in session:
+            logger.info("No user_id in session, redirecting to login")
+            return redirect(url_for('login'))
         return redirect(url_for('dashboard'))
-    return redirect(url_for('login'))
+    except Exception as e:
+        logger.error(f"Home route error: {str(e)}", exc_info=True)
+        return "Internal Server Error", 500
 
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("5 per minute")
@@ -380,13 +380,13 @@ def login():
     form = LoginForm()
     if form.validate_on_submit():
         username = form.username.data.strip()
-        password = form.password.data
         user = User.query.filter_by(username=username).first()
-        if user and check_password_hash(user.password, password):
+        if user and check_password_hash(user.password, form.password.data):
             if not user.approved:
                 flash('Your account is pending approval.', 'warning')
                 return render_template('login.html', form=form)
             session['user_id'] = user.id
+            session['user_role'] = user.role  # Store role in session
             db.session.add(AuditLog(user_id=user.id, action='login', details=f'User {username} logged in'))
             db.session.commit()
             flash('Login successful!', 'success')
@@ -413,7 +413,7 @@ def signup():
                 approved=False
             )
             db.session.add(user)
-            db.session.add(AuditLog(user_id=user.id, action='signup_request', details=f'User {user.username} requested account'))
+            db.session.add(AuditLog(user_id=user.id, action='signup', details=f'User {user.username} requested account'))
             db.session.commit()
             flash('Sign-up request submitted. Awaiting auditor approval.', 'success')
             return redirect(url_for('login'))
@@ -423,36 +423,41 @@ def signup():
         except SQLAlchemyError as e:
             db.session.rollback()
             logger.error(f"Signup error: {str(e)}")
-            flash(f'Failed to submit sign-up request: {str(e)}', 'danger')
+            flash(f'Failed to sign up: {str(e)}', 'danger')
     return render_template('signup.html', form=form)
 
 @app.route('/forgot-password', methods=['GET', 'POST'])
-@limiter.limit("5 per minute")
+@limiter.limit("3 per hour")
 def forgot_password():
     form = ForgotPasswordForm()
     if form.validate_on_submit():
-        username = form.username.data.strip()
-        phone_number = form.phone_number.data.strip()
-        user = User.query.filter_by(username=username, phone_number=phone_number).first()
-        if user:
-            # Simulate sending reset link (actual SMS would require Twilio or similar)
-            reset_token = generate_reset_token()
-            user.reset_token = reset_token
-            user.reset_token_expiry = datetime.utcnow() + timedelta(hours=1)
-            db.session.add(AuditLog(user_id=user.id, action='password_reset_request', details=f'Password reset requested for {username}'))
-            db.session.commit()
-            flash(f'A password reset link has been sent to {phone_number}.', 'success')
-            # In production, integrate with an SMS service to send: url_for('reset_password', token=reset_token, _external=True)
-        else:
-            flash('Invalid username or phone number.', 'danger')
+        try:
+            username = form.username.data.strip()
+            phone_number = form.phone_number.data.strip()
+            user = User.query.filter_by(username=username, phone_number=phone_number).first()
+            if user:
+                token = generate_reset_token()
+                user.reset_token = token
+                user.reset_token_expiry = datetime.utcnow() + timedelta(hours=1)
+                db.session.add(AuditLog(user_id=user.id, action='request_password_reset', details=f'Password reset requested for {username}'))
+                db.session.commit()
+                reset_link = url_for('reset_password', token=token, _external=True)
+                flash(f'A password reset link has been sent to {phone_number}: {reset_link}', 'success')
+                return redirect(url_for('login'))
+            else:
+                flash('Invalid username or phone number.', 'danger')
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            logger.error(f"Forgot password error: {str(e)}")
+            flash(f'Failed to process request: {str(e)}', 'danger')
     return render_template('forgot_password.html', form=form)
 
 @app.route('/reset-password/<token>', methods=['GET', 'POST'])
-def reset_password(token):
+def reset_password():
     user = User.query.filter_by(reset_token=token).first()
     if not user or user.reset_token_expiry < datetime.utcnow():
         flash('Invalid or expired reset token.', 'danger')
-        return redirect(url_for('forgot_password'))
+        return redirect(url_for('login'))
 
     form = ResetPasswordForm()
     if form.validate_on_submit():
@@ -460,18 +465,18 @@ def reset_password(token):
             user.password = generate_password_hash(form.password.data)
             user.reset_token = None
             user.reset_token_expiry = None
-            db.session.add(AuditLog(user_id=user.id, action='password_reset', details=f'Password reset for {user.username}'))
+            db.session.add(AuditLog(user_id=user.id, action='reset_password', details=f'Password reset for {user.username}'))
             db.session.commit()
             flash('Password reset successfully. Please log in.', 'success')
             return redirect(url_for('login'))
         except SQLAlchemyError as e:
             db.session.rollback()
-            logger.error(f"Password reset error: {str(e)}")
+            logger.error(f"Reset password error: {str(e)}")
             flash(f'Failed to reset password: {str(e)}', 'danger')
     return render_template('reset_password.html', form=form, token=token)
 
-@app.route('/manage-users', methods=['GET', 'POST'])
-def manage_users():
+@app.route('/admin/users', methods=['GET', 'POST'])
+def admin_users():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     user = User.query.get(session['user_id'])
@@ -479,14 +484,14 @@ def manage_users():
         return redirect(url_for('dashboard'))
 
     if request.method == 'POST':
-        user_id = request.form.get('user_id', type=int)
-        action = request.form.get('action')
-        target_user = User.query.get(user_id)
-        if not target_user:
-            flash('User not found.', 'danger')
-            return redirect(url_for('manage_users'))
-
         try:
+            user_id = request.form.get('user_id', type=int)
+            action = request.form.get('action')
+            target_user = User.query.get(user_id)
+            if not target_user:
+                flash('User not found.', 'danger')
+                return redirect(url_for('admin_users'))
+
             if action == 'approve':
                 target_user.approved = True
                 db.session.add(AuditLog(user_id=user.id, action='approve_user', details=f'Approved user {target_user.username}'))
@@ -497,18 +502,17 @@ def manage_users():
                 db.session.delete(target_user)
                 db.session.add(AuditLog(user_id=user.id, action='delete_user', details=f'Deleted user {target_user.username}'))
             db.session.commit()
-            flash(f'User {target_user.username} {action}d successfully.', 'success')
+            flash(f'User {action}d successfully.', 'success')
         except SQLAlchemyError as e:
             db.session.rollback()
             logger.error(f"User management error: {str(e)}")
-            flash(f'Failed to {action} user: {str(e)}', 'danger')
-        return redirect(url_for('manage_users'))
+            flash(f'Failed to process action: {str(e)}', 'danger')
 
     users = User.query.all()
-    return render_template('manage_users.html', users=users, user=user)
+    return render_template('admin_users.html', users=users, user=user)
 
-@app.route('/view-reports', methods=['GET', 'POST'])
-def view_reports():
+@app.route('/dashboard')
+def dashboard():
     try:
         if 'user_id' not in session:
             logger.info("No user_id in session, redirecting to login")
@@ -519,59 +523,15 @@ def view_reports():
             session.clear()
             flash('User not found. Please log in again.', 'warning')
             return redirect(url_for('login'))
-
-        # Get filter parameters from request
-        facility_id = request.args.get('facility_id', type=int, default=user.facility_id)
-        start_date = request.args.get('start_date')
-        period = request.args.get('period', 'weekly')
         page = request.args.get('page', 1, type=int)
-
-        # Restrict to user's facility unless admin
-        if user.role != 'admin' and facility_id != user.facility_id:
-            flash('You can only view reports for your assigned facility.', 'danger')
-            facility_id = user.facility_id
-
-        # Build query
-        query = Report.query.filter_by(facility_id=facility_id)
-        if start_date:
-            try:
-                query = query.filter(Report.report_date >= datetime.strptime(start_date, '%Y-%m-%d').date())
-            except ValueError:
-                flash('Invalid date format. Use YYYY-MM-DD.', 'danger')
-        if period:
-            query = query.filter_by(report_period=period)
-
-        reports = query.order_by(Report.report_date.desc()).paginate(page=page, per_page=10)
-        facilities = Facility.query.all() if user.role == 'admin' else [user.facility]
-        return render_template('view_reports.html', user=user, reports=reports, facilities=facilities, selected_facility_id=facility_id, start_date=start_date, period=period)
+        logger.info(f"Fetching reports for user {user.username}, facility {user.facility_id}, page {page}")
+        reports = Report.query.filter_by(facility_id=user.facility_id).order_by(Report.report_date.desc()).paginate(page=page, per_page=10)
+        provinces = Province.query.all()
+        logger.info(f"Rendering dashboard for user {user.username}")
+        return render_template('dashboard.html', user=user, reports=reports, provinces=provinces)
     except Exception as e:
-        logger.error(f"View reports route error: {str(e)}", exc_info=True)
+        logger.error(f"Dashboard route error: {str(e)}", exc_info=True)
         return "Internal Server Error", 500
-
-@app.route('/dashboard')
-def dashboard():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    user = User.query.get(session['user_id'])
-    if not user:
-        session.clear()
-        flash('User not found. Please log in again.', 'warning')
-        return redirect(url_for('login'))
-
-    page = request.args.get('page', 1, type=int)
-    reports = Report.query.filter_by(facility_id=user.facility_id).order_by(Report.report_date.desc()).paginate(page=page, per_page=10)
-    provinces = Province.query.all()
-    return render_template('dashboard.html', user=user, reports=reports, provinces=provinces)
-
-@app.route('/logout')
-def logout():
-    user_id = session.get('user_id')
-    session.clear()
-    if user_id:
-        db.session.add(AuditLog(user_id=user_id, action='logout', details='User logged out'))
-        db.session.commit()
-    flash('Logged out successfully.', 'info')
-    return redirect(url_for('login'))
 
 @app.route('/submit-report', methods=['GET', 'POST'])
 def submit_report():
@@ -622,7 +582,7 @@ def submit_report():
                 return render_template('submit_report.html', form=form, item_forms=item_forms, commodities=commodities, user=user)
 
             for item in items:
-                db.session.add(ReportItem(
+                report_item = ReportItem(
                     report_id=report.id,
                     commodity_id=item['commodity_id'],
                     opening_balance=item['opening_balance'],
@@ -631,321 +591,17 @@ def submit_report():
                     closing_balance=item['closing_balance'],
                     exp_date=item['exp_date'],
                     remarks=item['remarks']
-                ))
-
-            db.session.add(AuditLog(user_id=user.id, action='submit_report', details=f'Report ID {report.id} submitted'))
+                )
+                db.session.add(report_item)
+            db.session.add(AuditLog(user_id=user.id, action='submit_report', details=f'Submitted report for facility {facility_id}'))
             db.session.commit()
-            cache.delete_memoized(get_previous_report)
-            flash('Report submitted successfully!', 'success')
+            flash('Report submitted successfully.', 'success')
             return redirect(url_for('dashboard'))
-
-        except (ValueError, SQLAlchemyError) as e:
+        except SQLAlchemyError as e:
             db.session.rollback()
-            logger.error(f"Submit error: {str(e)}")
+            logger.error(f"Submit report error: {str(e)}")
             flash(f'Failed to submit report: {str(e)}', 'danger')
-
-    # Pre-fill forms
-    form_data = {}
-    facility_id = user.facility_id if user.role != 'admin' else (form.facility_id.data or Facility.query.first().id)
-    for commodity in commodities:
-        cid = commodity.id
-        prev = get_previous_report(facility_id, cid)
-        form_data[f'opening_balance_{cid}'] = prev.closing_balance if prev else 0
-        item_forms[cid].opening_balance.data = prev.closing_balance if prev else 0
-        item_forms[cid].received.data = 0
-        item_forms[cid].used.data = 0
-        item_forms[cid].closing_balance.data = prev.closing_balance if prev else 0
-        item_forms[cid].exp_date.data = ''
-        item_forms[cid].remarks.data = ''
-
-    return render_template('submit_report.html', form=form, item_forms=item_forms, commodities=commodities, user=user, form_data=form_data)
-
-@app.route('/add-commodity', methods=['GET', 'POST'])
-def add_commodity():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    user = User.query.get(session['user_id'])
-    if not check_permission(user, 'admin'):
-        return redirect(url_for('dashboard'))
-
-    form = CommodityForm()
-    if form.validate_on_submit():
-        try:
-            commodity = Commodity(
-                name=form.name.data.strip(),
-                description=form.description.data.strip(),
-                active=True
-            )
-            db.session.add(commodity)
-            db.session.add(AuditLog(user_id=user.id, action='add_commodity', details=f'Commodity {commodity.name} added'))
-            db.session.commit()
-            flash('Commodity added successfully!', 'success')
-            return redirect(url_for('dashboard'))
-        except IntegrityError:
-            db.session.rollback()
-            flash('Commodity name already exists.', 'danger')
-        except SQLAlchemyError as e:
-            db.session.rollback()
-            logger.error(f"Add commodity error: {str(e)}")
-            flash(f'Failed to add commodity: {str(e)}', 'danger')
-
-    return render_template('add_commodity.html', form=form, user=user)
-
-@app.route('/add-facility', methods=['GET', 'POST'])
-def add_facility():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    user = User.query.get(session['user_id'])
-    if not check_permission(user, 'admin'):
-        return redirect(url_for('dashboard'))
-
-    form = FacilityForm()
-    form.province_id.choices = [(p.id, p.name) for p in Province.query.all()]
-    form.hub_id.choices = [(h.id, h.name) for h in Hub.query.filter_by(province_id=form.province_id.data or Province.query.first().id).all()]
-    form.district_id.choices = [(d.id, d.name) for d in District.query.filter_by(hub_id=form.hub_id.data or Hub.query.first().id).all()]
-
-    if form.validate_on_submit():
-        try:
-            facility = Facility(
-                name=form.name.data.strip(),
-                district_id=form.district_id.data
-            )
-            db.session.add(facility)
-            db.session.add(AuditLog(user_id=user.id, action='add_facility', details=f'Facility {facility.name} added'))
-            db.session.commit()
-            flash('Facility added successfully!', 'success')
-            return redirect(url_for('dashboard'))
-        except IntegrityError:
-            db.session.rollback()
-            flash('Facility name already exists.', 'danger')
-        except SQLAlchemyError as e:
-            db.session.rollback()
-            logger.error(f"Add facility error: {str(e)}")
-            flash(f'Failed to add facility: {str(e)}', 'danger')
-
-    return render_template('add_facility.html', form=form, user=user)
-
-@app.route('/view-reports', methods=['GET'])
-def view_reports():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    user = User.query.get(session['user_id'])
-    if not check_permission(user, 'auditor'):
-        return redirect(url_for('dashboard'))
-
-    page = request.args.get('page', 1, type=int)
-    facility_id = request.args.get('facility_id', type=int)
-    period = request.args.get('period', 'weekly')
-    start_date = request.args.get('start_date', type=str)
-    end_date = request.args.get('end_date', type=str)
-
-    reports_query = Report.query
-    if facility_id and user.role == 'admin':
-        reports_query = reports_query.filter_by(facility_id=facility_id)
-    elif user.role != 'admin':
-        reports_query = reports_query.filter_by(facility_id=user.facility_id)
-
-    if period == 'daily':
-        if start_date:
-            try:
-                start = datetime.strptime(start_date, '%Y-%m-%d').date()
-                reports_query = reports_query.filter(Report.report_date == start)
-            except ValueError:
-                flash('Invalid start date format.', 'danger')
-    elif period == 'weekly':
-        if start_date and end_date:
-            try:
-                start = datetime.strptime(start_date, '%Y-%m-%d').date()
-                end = datetime.strptime(end_date, '%Y-%m-%d').date()
-                reports_query = reports_query.filter(Report.report_date.between(start, end))
-            except ValueError:
-                flash('Invalid date format.', 'danger')
-    elif period == 'quarterly':
-        if start_date and end_date:
-            try:
-                start = datetime.strptime(start_date, '%Y-%m-%d').date()
-                end = datetime.strptime(end_date, '%Y-%m-%d').date()
-                reports_query = reports_query.filter(Report.report_date.between(start, end))
-            except ValueError:
-                flash('Invalid date format.', 'danger')
-
-    reports = reports_query.order_by(Report.report_date.desc()).paginate(page=page, per_page=10)
-    facilities = Facility.query.all() if user.role == 'admin' else [user.facility]
-    return render_template('view_reports.html', reports=reports, user=user, facilities=facilities, period=period, start_date=start_date, end_date=end_date)
-
-@app.route('/analytics', methods=['GET'])
-def analytics():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    user = User.query.get(session['user_id'])
-    if not check_permission(user, 'auditor'):
-        return redirect(url_for('dashboard'))
-
-    commodity_id = request.args.get('commodity_id', type=int)
-    facility_id = request.args.get('facility_id', type=int) if user.role == 'admin' else user.facility_id
-    period = request.args.get('period', 'weekly')
-    start_date = request.args.get('start_date', type=str)
-    end_date = request.args.get('end_date', type=str)
-
-    if not commodity_id:
-        commodity = Commodity.query.first()
-        if not commodity:
-            flash('No commodities available.', 'warning')
-            return redirect(url_for('dashboard'))
-        commodity_id = commodity.id
-
-    commodity = Commodity.query.get(commodity_id)
-    if not commodity:
-        flash('Selected commodity not found.', 'warning')
-        return redirect(url_for('dashboard'))
-
-    reports_query = ReportItem.query.join(Report).filter(
-        ReportItem.commodity_id == commodity_id,
-        Report.facility_id == (facility_id or user.facility_id)
-    )
-
-    if period == 'daily':
-        if start_date:
-            try:
-                start = datetime.strptime(start_date, '%Y-%m-%d').date()
-                reports_query = reports_query.filter(Report.report_date == start)
-            except ValueError:
-                flash('Invalid start date format.', 'danger')
-    elif period == 'weekly':
-        if start_date and end_date:
-            try:
-                start = datetime.strptime(start_date, '%Y-%m-%d').date()
-                end = datetime.strptime(end_date, '%Y-%m-%d').date()
-                reports_query = reports_query.filter(Report.report_date.between(start, end))
-            except ValueError:
-                flash('Invalid date format.', 'danger')
-    elif period == 'quarterly':
-        if start_date and end_date:
-            try:
-                start = datetime.strptime(start_date, '%Y-%m-%d').date()
-                end = datetime.strptime(end_date, '%Y-%m-%d').date()
-                reports_query = reports_query.filter(Report.report_date.between(start, end))
-            except ValueError:
-                flash('Invalid date format.', 'danger')
-
-    reports = reports_query.order_by(Report.report_date.asc()).all()
-
-    labels = [r.report.report_date.strftime('%Y-%m-%d') for r in reports] if reports else [datetime.utcnow().strftime('%Y-%m-%d')]
-    data = [int(r.closing_balance) for r in reports] if reports else [0]
-    chart_data = {
-        'type': 'line',
-        'data': {
-            'labels': labels,
-            'datasets': [{
-                'label': commodity.name + ' Closing Balance',
-                'data': data,
-                'borderColor': '#3B82F6',
-                'backgroundColor': 'rgba(59, 130, 246, 0.1)',
-                'fill': True,
-                'tension': 0.4
-            }]
-        },
-        'options': {
-            'responsive': True,
-            'scales': {
-                'y': {
-                    'beginAtZero': True,
-                    'title': {'display': True, 'text': 'Closing Balance'}
-                },
-                'x': {
-                    'title': {'display': True, 'text': 'Report Date'}
-                }
-            },
-            'plugins': {
-                'legend': {'position': 'top'},
-                'title': {'display': True, 'text': commodity.name + ' Inventory Trend (' + period.capitalize() + ')'}
-            }
-        }
-    }
-
-    try:
-        chart_data_json = json.dumps(chart_data, ensure_ascii=False)
-    except (TypeError, ValueError) as e:
-        logger.error(f"Failed to serialize chart_data: {str(e)}")
-        flash('Error generating analytics chart.', 'danger')
-        chart_data_json = json.dumps({
-            'type': 'line',
-            'data': {'labels': [], 'datasets': []},
-            'options': {'plugins': {'title': {'display': True, 'text': 'No Data Available'}}}
-        })
-
-    facilities = Facility.query.all() if user.role == 'admin' else [user.facility]
-    return render_template('analytics.html', chart_data=chart_data_json, commodities=Commodity.query.all(), selected_commodity=commodity, user=user, facilities=facilities, period=period, start_date=start_date, end_date=end_date)
-
-@app.route('/export-reports', methods=['GET'])
-def export_reports():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    user = User.query.get(session['user_id'])
-    if not check_permission(user, 'auditor'):
-        return redirect(url_for('dashboard'))
-
-    facility_id = request.args.get('facility_id', type=int)
-    period = request.args.get('period', 'weekly')
-    start_date = request.args.get('start_date', type=str)
-    end_date = request.args.get('end_date', type=str)
-
-    reports_query = Report.query
-    if facility_id and user.role == 'admin':
-        reports_query = reports_query.filter_by(facility_id=facility_id)
-    elif user.role != 'admin':
-        reports_query = reports_query.filter_by(facility_id=user.facility_id)
-
-    if period == 'daily':
-        if start_date:
-            try:
-                start = datetime.strptime(start_date, '%Y-%m-%d').date()
-                reports_query = reports_query.filter(Report.report_date == start)
-            except ValueError:
-                flash('Invalid start date format.', 'danger')
-    elif period == 'weekly':
-        if start_date and end_date:
-            try:
-                start = datetime.strptime(start_date, '%Y-%m-%d').date()
-                end = datetime.strptime(end_date, '%Y-%m-%d').date()
-                reports_query = reports_query.filter(Report.report_date.between(start, end))
-            except ValueError:
-                flash('Invalid date format.', 'danger')
-    elif period == 'quarterly':
-        if start_date and end_date:
-            try:
-                start = datetime.strptime(start_date, '%Y-%m-%d').date()
-                end = datetime.strptime(end_date, '%Y-%m-%d').date()
-                reports_query = reports_query.filter(Report.report_date.between(start, end))
-            except ValueError:
-                flash('Invalid date format.', 'danger')
-
-    reports = reports_query.all()
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(['Report ID', 'Province', 'Hub', 'District', 'Facility', 'Report Date', 'Period', 'Commodity', 'Opening Balance', 'Received', 'Used', 'Closing Balance', 'Expiration Date', 'Remarks'])
-    
-    for report in reports:
-        facility = report.facility
-        district = facility.district
-        hub = district.hub
-        province = hub.province
-        for item in report.items:
-            writer.writerow([
-                report.id, province.name, hub.name, district.name, facility.name, report.report_date, report.report_period,
-                item.commodity.name, item.opening_balance, item.received, item.used,
-                item.closing_balance, item.exp_date or '', item.remarks or ''
-            ])
-
-    db.session.add(AuditLog(user_id=user.id, action='export_reports', details='Exported reports to CSV'))
-    db.session.commit()
-
-    output.seek(0)
-    response = make_response(output.getvalue())
-    response.headers['Content-Disposition'] = 'attachment; filename=reports.csv'
-    response.headers['Content-Type'] = 'text/csv'
-    return response
+    return render_template('submit_report.html', form=form, item_forms=item_forms, commodities=commodities, user=user)
 
 @app.route('/import-reports', methods=['GET', 'POST'])
 def import_reports():
@@ -954,81 +610,88 @@ def import_reports():
     user = User.query.get(session['user_id'])
     if not check_permission(user, 'admin'):
         return redirect(url_for('dashboard'))
-
     form = ImportForm()
     if form.validate_on_submit():
-        file = form.file.data
-        if not file.filename.endswith(('.xlsx', '.xls')):
-            flash('Please upload a valid Excel file (.xlsx or .xls).', 'danger')
-            return redirect(url_for('import_reports'))
-
         try:
-            data = parse_excel(file)
-            for item in data:
-                commodity = Commodity.query.get(item['commodity_id'])
-                if not commodity:
-                    flash(f"Invalid commodity: {item['commodity_id']}", 'danger')
-                    continue
-
-                facility = Facility.query.get(user.facility_id)
-                if not facility:
-                    flash(f"Invalid facility ID: {user.facility_id}", 'danger')
-                    continue
-
-                report = Report(
-                    facility_id=facility.id,
-                    user_id=user.id,
-                    report_date=datetime.utcnow().date(),
-                    report_period='weekly'
-                )
+            file = form.file.data
+            items = parse_excel(file)
+            errors = validate_report_items(items, user.facility_id)
+            if errors:
+                for err in errors:
+                    flash(err, 'danger')
+            else:
+                report = Report(facility_id=user.facility_id, user_id=user.id, report_date=datetime.utcnow().date(), report_period='weekly')
                 db.session.add(report)
                 db.session.flush()
-
-                db.session.add(ReportItem(
-                    report_id=report.id,
-                    commodity_id=item['commodity_id'],
-                    opening_balance=item['opening_balance'],
-                    received=item['received'],
-                    used=item['used'],
-                    closing_balance=item['closing_balance'],
-                    exp_date=item['exp_date'],
-                    remarks=item['remarks']
-                ))
-
-            db.session.add(AuditLog(user_id=user.id, action='import_reports', details='Imported reports from Excel'))
-            db.session.commit()
-            cache.delete_memoized(get_previous_report)
-            flash('Reports imported successfully!', 'success')
-        except (ValueError, SQLAlchemyError) as e:
+                for item in items:
+                    report_item = ReportItem(
+                        report_id=report.id,
+                        commodity_id=item['commodity_id'],
+                        opening_balance=item['opening_balance'],
+                        received=item['received'],
+                        used=item['used'],
+                        closing_balance=item['closing_balance'],
+                        exp_date=item['exp_date'],
+                        remarks=item['remarks']
+                    )
+                    db.session.add(report_item)
+                db.session.add(AuditLog(user_id=user.id, action='import_report', details=f'Imported report for facility {user.facility_id}'))
+                db.session.commit()
+                flash('Report imported successfully.', 'success')
+                return redirect(url_for('dashboard'))
+        except Exception as e:
             db.session.rollback()
-            logger.error(f"Import error: {str(e)}")
-            flash(f'Failed to import reports: {str(e)}', 'danger')
-
+            logger.error(f"Import report error: {str(e)}")
+            flash(f'Failed to import report: {str(e)}', 'danger')
     return render_template('import_reports.html', form=form, user=user)
 
-# API Endpoints for Dropdowns
-@app.route('/get_hubs/<int:province_id>')
-def get_hubs(province_id):
-    hubs = Hub.query.filter_by(province_id=province_id).all()
-    return jsonify([{'id': h.id, 'name': h.name} for h in hubs])
+@app.route('/view-reports', methods=['GET', 'POST'])
+def view_reports():
+    try:
+        if 'user_id' not in session:
+            logger.info("No user_id in session, redirecting to login")
+            return redirect(url_for('login'))
+        user = User.query.get(session['user_id'])
+        if not user:
+            logger.warning("User not found, clearing session")
+            session.clear()
+            flash('User not found. Please log in again.', 'warning')
+            return redirect(url_for('login'))
 
-@app.route('/get_districts/<int:hub_id>')
-def get_districts(hub_id):
-    districts = District.query.filter_by(hub_id=hub_id).all()
-    return jsonify([{'id': d.id, 'name': d.name} for d in districts])
+        facility_id = request.args.get('facility_id', type=int, default=user.facility_id)
+        start_date = request.args.get('start_date')
+        period = request.args.get('period', 'weekly')
+        page = request.args.get('page', 1, type=int)
 
-@app.route('/get_facilities/<int:district_id>')
-def get_facilities(district_id):
-    facilities = Facility.query.filter_by(district_id=district_id).all()
-    return jsonify([{'id': f.id, 'name': f.name} for f in facilities])
+        if user.role != 'admin' and facility_id != user.facility_id:
+            flash('You can only view reports for your assigned facility.', 'danger')
+            facility_id = user.facility_id
 
-with app.app_context():
-    initialize_database()
+        query = Report.query.filter_by(facility_id=facility_id)
+        if start_date:
+            try:
+                query = query.filter(Report.report_date >= datetime.strptime(start_date, '%Y-%m-%d').date())
+            except ValueError:
+                flash('Invalid date format. Use YYYY-MM-DD.', 'danger')
+        if period:
+            query = query.filter_by(report_period=period)
 
-@app.teardown_appcontext
-def shutdown_session(exception=None):
-    db.session.remove()
+        reports = query.order_by(Report.report_date.desc()).paginate(page=page, per_page=10)
+        facilities = Facility.query.all() if user.role == 'admin' else [user.facility]
+        return render_template('view_reports.html', user=user, reports=reports, facilities=facilities, selected_facility_id=facility_id, start_date=start_date, period=period)
+    except Exception as e:
+        logger.error(f"View reports route error: {str(e)}", exc_info=True)
+        return "Internal Server Error", 500
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('Logged out successfully.', 'success')
+    return redirect(url_for('login'))
+
+# Initialize database
+initialize_database()
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=os.environ.get('FLASK_ENV', 'development') == 'development')
+    port = int(os.environ.get('PORT', 8000))
+    app.run(host='0.0.0.0', port=port)
