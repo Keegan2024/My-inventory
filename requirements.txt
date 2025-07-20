@@ -1,4 +1,4 @@
-flask==2.0.1
+flask==2.3.3
 werkzeug==2.0.3
 flask-sqlalchemy==2.5.1
 SQLAlchemy==1.4.41
@@ -10,6 +10,5 @@ flask-limiter==1.4
 openpyxl==3.0.10
 pandas==1.4.3
 numpy==1.23.5
-gunicorn==23.0.0
+gunicorn
 redis==4.5.4
-# Force rebuild 2025-07-17-3
